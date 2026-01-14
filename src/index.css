@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* --- ANIMATION WHATSAPP --- */
+/* Définition du mouvement "Sautiller" */
+@keyframes sautiller {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px); /* Saut en haut */
+  }
+  60% {
+    transform: translateY(-5px); /* Petit rebond */
+  }
+}
+
+/* Création de la classe utilisable */
+.animate-whatsapp {
+  /* L'animation dure 3 secondes et tourne en boucle */
+  animation: sautiller 3s infinite ease-in-out;
+}
+
+/* Effet au survol : on arrête de sauter pour faciliter le clic */
+.animate-whatsapp:hover {
+  animation: none;
+  transform: scale(1.1); /* Grossit légèrement */
+}

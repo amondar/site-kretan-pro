@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
-import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send } from 'lucide-react';
+import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram } from 'lucide-react';
+
 
 // --- COMPOSANT ASSISTANT CHAT (Intégré dans le même fichier pour simplifier) ---
 const ChatAssistant = () => {
@@ -335,18 +336,66 @@ const App = () => {
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
-      <section className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">Un projet en Côte d'Ivoire ?</h2>
-          {/* BOUTON 4 : Footer */}
-          <button 
-            onClick={() => openModal("Contactez-nous maintenant")}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg text-lg font-bold transition"
-          >
-            Contactez-nous maintenant
-          </button>
-          <p className="mt-8 text-sm text-gray-500">© 2024 KréTan Pro+. Tous droits réservés.</p>
+      {/* --- FOOTER SOCIAL & CONTACT --- */}
+      <section className="bg-gray-900 text-white pt-16 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+            
+            {/* Colonne 1 : La Marque */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                 {/* Si vous avez le logo en blanc, utilisez-le ici, sinon texte */}
+                 <span className="text-2xl font-bold text-teal-400">KréTan</span>
+                 <span className="text-2xl font-bold text-orange-500">Pro+</span>
+              </div>
+              <p className="text-gray-400 leading-relaxed">
+                Votre partenaire de confiance en Côte d'Ivoire pour construire, rénover et gérer vos biens. L'expertise centralisée.
+              </p>
+            </div>
+
+            {/* Colonne 2 : Liens Rapides */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-4">Liens Rapides</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#propos" className="hover:text-orange-500 transition">Qui sommes-nous ?</a></li>
+                <li><a href="#services" className="hover:text-orange-500 transition">Nos Services</a></li>
+                <li><button onClick={() => openModal("Demander un devis")} className="hover:text-orange-500 transition text-left">Demander un Devis</button></li>
+              </ul>
+            </div>
+
+            {/* Colonne 3 : Réseaux Sociaux (LE PLUS IMPORTANT POUR VOUS) */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-4">Suivez-nous</h3>
+              <p className="text-gray-400 mb-4 text-sm">Découvrez nos chantiers en vidéo et nos conseils.</p>
+              
+              <div className="flex space-x-4">
+                {/* Facebook */}
+                <a href="https://facebook.com/kretanpro" target="_blank" rel="noreferrer" className="bg-gray-800 p-3 rounded-full hover:bg-[#1877F2] transition hover:-translate-y-1">
+                  <Facebook size={20} />
+                </a>
+                
+                {/* YouTube */}
+                <a href="https://youtube.com/@kretanpro" target="_blank" rel="noreferrer" className="bg-gray-800 p-3 rounded-full hover:bg-[#FF0000] transition hover:-translate-y-1">
+                  <Youtube size={20} />
+                </a>
+
+                {/* LinkedIn */}
+                <a href="https://linkedin.com/company/kretanpro" target="_blank" rel="noreferrer" className="bg-gray-800 p-3 rounded-full hover:bg-[#0A66C2] transition hover:-translate-y-1">
+                  <Linkedin size={20} />
+                </a>
+
+                {/* Instagram */}
+                <a href="https://instagram.com/kretanpro" target="_blank" rel="noreferrer" className="bg-gray-800 p-3 rounded-full hover:bg-[#E4405F] transition hover:-translate-y-1">
+                  <Instagram size={20} />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 pt-8 text-center">
+            <p className="text-sm text-gray-500">© 2026 KréTan Pro+ Côte d'Ivoire. Tous droits réservés.</p>
+          </div>
         </div>
       </section>
 
@@ -395,6 +444,28 @@ const App = () => {
       )}
 
       <ChatAssistant />
+
+{/* --- BOUTON WHATSAPP FLOTTANT --- */}
+      <a 
+        href="https://wa.me/2250700000000?text=Bonjour%20KréTan%20Pro%2B" // REMPLACEZ LE NUMÉRO
+        target="_blank" 
+        rel="noopener noreferrer"
+        // J'ai ajouté 'animate-whatsapp' ici 👇
+        className="animate-whatsapp fixed bottom-6 left-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-lg flex items-center gap-2 transition-colors hover:bg-green-600"
+        title="Discuter sur WhatsApp"
+      >
+        {/* Le logo SVG WhatsApp */}
+        <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        </svg>
+        
+        {/* BONUS : La pastille rouge de notification (Effet psychologique fort) */}
+        <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-4 w-4">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] text-white justify-center items-center font-bold">1</span>
+        </span>
+      </a>
+
     </div>
   );
 };
