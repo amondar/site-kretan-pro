@@ -246,10 +246,11 @@ const App = () => {
               
               {/* Côté Gauche : LE FLYER (Image) */}
               <div className="relative h-64 lg:h-full bg-gray-200">
-                {/* Remplacez src par l'image de votre flyer promo */}
+                {/* --- LE CHANGEMENT EST ICI --- */}
                 <img 
                   className="absolute inset-0 w-full h-full object-cover"
-                  src="https://images.unsplash.com/photo-1581578731117-104f2a863a17?q=80&w=1000&auto=format&fit=crop" 
+                  // J'ai mis un nouveau lien d'image qui fonctionne :
+                  src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=1000&auto=format&fit=crop" 
                   alt="Flyer Promo KréTan"
                 />
                 {/* Badge de réduction */}
