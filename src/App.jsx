@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import emailjs from '@emailjs/browser';
 import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users } from 'lucide-react';
+import ChatAssistant from './ChatAssistant';
 
 const App = () => {
   // --- 1. DÉCLARATION DES ÉTATS (STATES) ---
@@ -408,6 +409,9 @@ const App = () => {
           </div>
         </div>
       )}
+      
+      {/* --- AJOUTER L'AGENT ICI --- */}
+      <ChatAssistant />
 
     </div>
   );
