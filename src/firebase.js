@@ -4,15 +4,20 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 
+// Your web app's Firebase configuration
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDJ6-sbpU7IVk_Y0ktegr52sSCP-GP5S6o",
-  authDomain: "kretan-app.firebaseapp.com",
-  projectId: "kretan-app",
-  storageBucket: "kretan-app.firebasestorage.app",
-  messagingSenderId: "122939699267",
-  appId: "1:122939699267:web:03aab0713c04a75fee64f6"
+
+  apiKey: "AIzaSyCVlUvESci3DdAWu04laKfVR88atfJrOms",
+  authDomain: "kretan-app-88637.firebaseapp.com",
+  projectId: "kretan-app-88637",
+  storageBucket: "kretan-app-88637.firebasestorage.app",
+  messagingSenderId: "121610372263",
+  appId: "1:121610372263:web:ce87b264ca282d01d9c782"
 
 };
+
+
 
 // Initialisation
 const app = initializeApp(firebaseConfig);
