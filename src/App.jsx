@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram } from 'lucide-react';
-
+import AccessControl from './AccessControl';
 
 // --- COMPOSANT ASSISTANT CHAT (Intégré dans le même fichier pour simplifier) ---
 const ChatAssistant = () => {
@@ -411,7 +411,15 @@ const App = () => {
 
           </div>
         </div>
-      </section>      
+      </section>  
+
+      {/* ... Section Siège Social ... */}
+
+      {/* SYSTEME DE CONTRÔLE D'ACCÈS */}
+      <AccessControl />
+
+      {/* Footer ... */}
+
       {/* --- FOOTER SOCIAL & CONTACT --- */}
       <section className="bg-gray-900 text-white pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
