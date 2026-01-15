@@ -7,7 +7,7 @@ import './index.css'
 import ReactGA from "react-ga4";
 
 // 2. INITIALISATION (Remplacez par votre ID 'G-...')
-ReactGA.initialize("G-XXXXXXXXXX"); 
+ReactGA.initialize("G-W3MYEHSMRZ"); 
 
 // 3. ENVOI DE LA PREMIÈRE PAGE VUE
 ReactGA.send({ hitType: "pageview", page: window.location.pathname });
