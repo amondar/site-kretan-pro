@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram } from 'lucide-react';
 import AccessControl from './AccessControl';
+import ReactGA from "react-ga4"; // N'oubliez pas l'import en haut
 
 // --- COMPOSANT ASSISTANT CHAT (Intégré dans le même fichier pour simplifier) ---
 const ChatAssistant = () => {
@@ -105,6 +106,15 @@ const App = () => {
   const openModal = (title) => {
     setModalTitle(title);
     setIsQuoteOpen(true);
+
+    // Suivi Google Analytics de l'ouverture du modal
+    // --- ENVOI DE L'ÉVÉNEMENT À GOOGLE ---
+  ReactGA.event({
+    category: "Business",
+    action: "Clic Bouton Devis",
+    label: title // On saura si c'est "Promo" ou "Menu Principal"
+  });
+
   };
 
   const colors = {
