@@ -3,35 +3,77 @@ import emailjs from '@emailjs/browser';
 import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram } from 'lucide-react';
 import AccessControl from './AccessControl';
 import ReactGA from "react-ga4"; // N'oubliez pas l'import en haut
-import { db } from './firebase';
-import { collection, getDocs } from 'firebase/firestore'; // Ajoutez getDocs
+// --- IMPORT OBLIGATOIRE POUR QUE L'IA FONCTIONNE ---
+import { db } from './firebase'; 
+import { collection, getDocs } from 'firebase/firestore';
+// ----------------------------------------------------
 
-// --- COMPOSANT ASSISTANT CHAT (Intégré dans le même fichier pour simplifier) ---
+// --- COMPOSANT ASSISTANT CHAT INTELLIGENT (Version Connectée) ---
 const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([{ text: "Bonjour ! Je suis l'assistant KréTan Pro+. Comment puis-je vous aider ?", isBot: true }]);
+  const [messages, setMessages] = useState([{ text: "Bonjour ! Je suis l'IA de KréTan Pro+. Posez-moi une question sur nos services.", isBot: true }]);
   const [inputValue, setInputValue] = useState("");
+  const [knowledgeBase, setKnowledgeBase] = useState([]); // Mémoire de l'IA
   const messagesEndRef = useRef(null);
-  const chatRef = useRef(null); 
 
+  // Faire défiler vers le bas à chaque message
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages]);
 
+  // 1. CHARGEMENT DU CERVEAU (Au démarrage du site)
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isOpen && chatRef.current && !chatRef.current.contains(event.target)) setIsOpen(false);
+    const fetchBrain = async () => {
+      try {
+        // On récupère la collection "chatbot_knowledge"
+        const querySnapshot = await getDocs(collection(db, "chatbot_knowledge"));
+        const rules = querySnapshot.docs.map(doc => doc.data());
+        
+        console.log("Cerveau IA chargé :", rules.length, "règles trouvées."); // Regardez la console (F12) pour voir si ça s'affiche
+        setKnowledgeBase(rules);
+      } catch (error) {
+        console.error("Erreur de chargement du cerveau IA :", error);
+      }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+    fetchBrain();
+  }, []);
 
+  // 2. INTELLIGENCE (Recherche de réponse)
   const getBotResponse = (text) => {
     const lowerText = text.toLowerCase();
-    if (lowerText.includes("mission") || lowerText.includes("qui")) return "Notre mission : centraliser l'expertise technique en Côte d'Ivoire. Un seul interlocuteur pour tout gérer de A à Z.";
-    if (lowerText.includes("pont") || lowerText.includes("btp")) return "C'est notre cœur de métier : Génie civil, construction de ponts et gros œuvre.";
-    if (lowerText.includes("devis") || lowerText.includes("prix")) return "Cliquez sur le bouton orange 'Demander un devis' pour une estimation gratuite.";
-    if (lowerText.includes("contact") || lowerText.includes("tel")) return "Nous intervenons partout en Côte d'Ivoire. Écrivez-nous via le formulaire.";
-    return "Je vous invite à cliquer sur 'Demander un devis' pour une réponse personnalisée.";
+    
+    // A. On cherche dans la base de données
+    const foundRule = knowledgeBase.find(rule => {
+      if (!rule.keywords) return false; // Sécurité si règle vide
+      // On découpe les mots clés (ex: "prix, tarif") en liste ["prix", "tarif"]
+      const keywordsList = rule.keywords.split(',').map(k => k.trim());
+      // On regarde si l'un des mots est dans la phrase du client
+      return keywordsList.some(k => lowerText.includes(k));
+    });
+
+    if (foundRule) return foundRule.response;
+
+    // B. Réponses par défaut (Si rien trouvé)
+    if (lowerText.includes("bonjour") || lowerText.includes("salut") || lowerText.includes("coucou")) {
+      return "Bonjour ! Comment puis-je vous aider dans votre projet de construction ?";
+    }
+    if (lowerText.includes("merci")) {
+      return "Je vous en prie ! N'hésitez pas si vous avez d'autres questions.";
+    }
+    if (lowerText.includes("contact") || lowerText.includes("téléphone") || lowerText.includes("numero")) {
+      return "Vous pouvez nous appeler au 07 08 50 51 09 ou cliquer sur le bouton WhatsApp.";
+    }
+
+    if (lowerText.includes("bye") || lowerText.includes("revoir") || lowerText.includes("a plus")) {
+      return "Au revoir ! Merci de votre visite sur KréTan Pro+. N'hésitez pas à revenir vers nous ! 👋";
+    }
+
+    if (lowerText.includes("merci")) {
+      return "Je vous en prie ! N'hésitez pas si vous avez d'autres questions.";
+    }
+    
+    return "Je n'ai pas l'information exacte pour l'instant. Souhaitez-vous demander un devis gratuit à nos experts ?";
+
+    
   };
 
   const handleSend = (e) => {
@@ -40,45 +82,73 @@ const ChatAssistant = () => {
     const userText = inputValue.trim();
     const lowerText = userText.toLowerCase();
 
+    // 1. Affiche le message de l'utilisateur
     setMessages((prev) => [...prev, { text: userText, isBot: false }]);
     setInputValue("");
 
-    if (lowerText.includes("au revoir") || lowerText.includes("bye") || lowerText.includes("merci")) {
-      setTimeout(() => setMessages((prev) => [...prev, { text: "Au plaisir ! À bientôt sur KréTan Pro+. 👋", isBot: true }]), 600);
-      setTimeout(() => setIsOpen(false), 2500);
-      return;
-    }
-
+    // 2. Le Robot réfléchit...
     setTimeout(() => {
-      setMessages((prev) => [...prev, { text: getBotResponse(userText), isBot: true }]);
-    }, 1000);
+      const botReply = getBotResponse(userText);
+      setMessages((prev) => [...prev, { text: botReply, isBot: true }]);
+
+      // ✨ 3. MAGIE : Si c'est un adieu, on ferme automatiquement
+      if (lowerText.includes("bye") || lowerText.includes("revoir") || lowerText.includes("a plus")) {
+        setTimeout(() => {
+          setIsOpen(false); // Le chat se ferme tout seul
+        }, 2500); // On laisse 2,5 secondes au client pour lire le message avant de fermer
+      }
+
+    }, 800);
   };
 
   return (
-    <div ref={chatRef} className="fixed bottom-6 right-6 z-50 font-sans">
+    <div className="fixed bottom-6 right-6 z-50 font-sans">
+      {/* BOUTON FLOTTANT */}
       {!isOpen && (
-        <button onClick={() => setIsOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-full shadow-lg transition-transform transform hover:scale-110 flex items-center gap-2">
+        <button onClick={() => setIsOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-full shadow-lg transition-transform transform hover:scale-110 flex items-center gap-2 animate-bounce-slow">
           <MessageCircle size={28} />
           <span className="font-bold hidden md:inline">Besoin d'aide ?</span>
         </button>
       )}
+
+      {/* FENÊTRE DE CHAT */}
       {isOpen && (
-        <div className="bg-white rounded-2xl shadow-2xl w-80 sm:w-96 flex flex-col border border-gray-200 overflow-hidden animate-fade-in-up">
+        <div className="bg-white rounded-2xl shadow-2xl w-80 sm:w-96 flex flex-col border border-gray-200 overflow-hidden animate-fade-in-up h-[450px]">
+          {/* En-tête */}
           <div className="bg-teal-700 p-4 flex justify-between items-center text-white cursor-pointer" onClick={() => setIsOpen(false)}>
-            <div className="flex items-center gap-2"><MessageCircle size={20} /><h3 className="font-bold text-sm">Assistant KréTan</h3></div>
+            <div className="flex items-center gap-2">
+              <div className="bg-white text-teal-700 p-1 rounded-full"><MessageCircle size={16} /></div>
+              <h3 className="font-bold text-sm">Assistant KréTan</h3>
+            </div>
             <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} className="hover:bg-teal-600 p-1 rounded-full"><X size={20} /></button>
           </div>
-          <div className="flex-1 h-80 overflow-y-auto p-4 bg-gray-50 space-y-4">
+
+          {/* Zone de messages */}
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-4">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.isBot ? "justify-start" : "justify-end"}`}>
-                <div className={`max-w-[85%] p-3 rounded-lg text-sm shadow-sm ${msg.isBot ? "bg-white text-gray-700 rounded-tl-none border" : "bg-orange-500 text-white rounded-tr-none"}`}>{msg.text}</div>
+                <div className={`max-w-[85%] p-3 rounded-lg text-sm shadow-sm ${
+                  msg.isBot 
+                    ? "bg-white text-gray-700 rounded-tl-none border border-gray-200" 
+                    : "bg-orange-500 text-white rounded-tr-none"
+                }`}>
+                  {msg.text}
+                </div>
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Zone de saisie */}
           <form onSubmit={handleSend} className="p-3 bg-white border-t flex gap-2">
-            <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Votre question..." className="flex-1 text-sm border rounded-full px-4 py-2 outline-none focus:border-orange-500" />
-            <button type="submit" className="bg-teal-600 text-white p-2 rounded-full"><Send size={18} /></button>
+            <input 
+              type="text" 
+              value={inputValue} 
+              onChange={(e) => setInputValue(e.target.value)} 
+              placeholder="Votre question..." 
+              className="flex-1 text-sm border rounded-full px-4 py-2 outline-none focus:border-orange-500 bg-gray-50 focus:bg-white transition" 
+            />
+            <button type="submit" className="bg-teal-600 hover:bg-teal-700 text-white p-2 rounded-full transition"><Send size={18} /></button>
           </form>
         </div>
       )}
