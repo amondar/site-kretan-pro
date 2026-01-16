@@ -3,6 +3,8 @@ import emailjs from '@emailjs/browser';
 import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram } from 'lucide-react';
 import AccessControl from './AccessControl';
 import ReactGA from "react-ga4"; // N'oubliez pas l'import en haut
+import { db } from './firebase';
+import { collection, getDocs } from 'firebase/firestore'; // Ajoutez getDocs
 
 // --- COMPOSANT ASSISTANT CHAT (Intégré dans le même fichier pour simplifier) ---
 const ChatAssistant = () => {
