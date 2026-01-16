@@ -7,6 +7,7 @@ import ReactGA from "react-ga4"; // N'oubliez pas l'import en haut
 import { db } from './firebase'; 
 import { collection, getDocs } from 'firebase/firestore';
 // ----------------------------------------------------
+import { translations } from './translations';
 
 // --- COMPOSANT ASSISTANT CHAT INTELLIGENT (Version Connectée) ---
 const ChatAssistant = () => {
@@ -158,11 +159,18 @@ const ChatAssistant = () => {
 
 // --- COMPOSANT PRINCIPAL APP ---
 const App = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // --- ÉTATS GÉNÉRAUX ---
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isQuoteOpen, setIsQuoteOpen] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // 2. AJOUTEZ CES 2 LIGNES ICI (Juste sous "const App")
+  const [lang, setLang] = useState('fr'); 
+  const t = translations[lang] || translations['fr']; // Sécurité si bug
+  console.log("Langue actuelle :", lang); // Pour vérifier dans la console
 
   // --- CONFIGURATION DES PROMOS ---
   // Mettez 'true' pour afficher, 'false' pour cacher
@@ -253,48 +261,98 @@ const App = () => {
         </div>
       )}
       
-      {/* --- NAVBAR --- */}
-      <nav className="bg-white shadow-sm fixed w-full z-50">
+     
+
+{/* --- DÉBUT DU HEADER (Menu du haut) --- */}
+      <header className="fixed w-full bg-white/95 backdrop-blur-sm shadow-md z-40 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => window.scrollTo(0,0)}>
-               <img src="/assets/logo.png" alt="Logo KréTan Pro+" className="h-20 w-auto" />
+          <div className="flex justify-between items-center h-20">
+            
+{/* LOGO (Version Image) */}
+            <div className="flex-shrink-0 flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+               
+               {/* Remplacez '/assets/logo.png' par le vrai nom de votre fichier si c'est différent */}
+               <img 
+                 src="/assets/logo.png" 
+                 alt="Logo KréTan Pro" 
+                 className="h-20 w-auto object-contain" 
+               />
+               
+               
             </div>
-            <div className="hidden md:flex space-x-8 items-center">
-              <a href="#propos" className="hover:text-orange-500 transition font-medium">Qui sommes-nous ?</a>
-              <a href="#services" className="hover:text-orange-500 transition font-medium">Nos Services</a>
+
+            {/* NAVIGATION ORDI (Caché sur mobile) */}
+{/* NAVIGATION ORDI */}
+            <nav className="hidden md:flex space-x-6 items-center">
+              <a href="#home" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_home}</a>
+              <a href="#services" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_services}</a>
               
-              {/* --- NOUVEAU LIEN --- */}
-              <a href="#siege" className="hover:text-orange-500 transition font-medium">Notre Siège</a>
-              {/* -------------------- */}
+              {/* Je garde Réalisations car c'est utile pour le SEO, mais vous pouvez l'enlever si vous voulez */}
+              <a href="#projects" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_projects}</a>
               
-              {/* BOUTON 1 : Navbar */}
+              {/* 👇 LE RETOUR DE "NOTRE SIÈGE" (pointe vers le bas de page ou la section contact) */}
+              <a href="#contact" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_location}</a>
+
+              {/* 👇 INDISPENSABLE POUR VOTRE SYSTÈME DE GESTION */}
+              <a href="#acces-pro" className="bg-teal-50 text-teal-700 px-3 py-1 rounded-full font-bold hover:bg-teal-100 transition flex items-center gap-1 text-sm border border-teal-200">
+                <Users size={14}/> {t.nav_access}
+              </a>
+            </nav>
+
+            {/* ACTION DROITE (Langue + Bouton Devis + Menu Mobile) */}
+            <div className="flex items-center gap-4">
+              
+              {/* SÉLECTEUR DE LANGUE (Drapeaux) */}
+              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                <button 
+                  onClick={() => setLang('fr')} 
+                  className={`px-2 py-1 rounded text-xs font-bold transition-all ${lang === 'fr' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  FR
+                </button>
+                <div className="w-[1px] h-3 bg-gray-300 mx-1"></div>
+                <button 
+                  onClick={() => setLang('en')} 
+                  className={`px-2 py-1 rounded text-xs font-bold transition-all ${lang === 'en' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  EN
+                </button>
+              </div>
+
+              {/* BOUTON DEVIS */}
               <button 
-                onClick={() => openModal("Demander un devis")}
-                className={`${colors.primary} text-white px-6 py-2.5 rounded-lg font-medium transition shadow-lg flex items-center gap-2`}
+                onClick={() => openModal('Demander un devis')}
+                className="hidden md:flex bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-full font-bold shadow-lg hover:shadow-orange-500/30 transition transform hover:-translate-y-0.5 items-center gap-2"
               >
-                Demander un devis <ArrowRight size={18} />
+                <PenTool size={18} /> <span>Devis</span>
               </button>
-            </div>
-            <div className="md:hidden flex items-center">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)}>{isMenuOpen ? <X size={28} /> : <Menu size={28} />}</button>
+
+              {/* BOUTON MENU MOBILE (Hamburger) */}
+              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden text-gray-700 p-2">
+                {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+              </button>
             </div>
           </div>
         </div>
-        {isMenuOpen && (
-          <div className="md:hidden bg-white border-t p-4 space-y-4 shadow-xl">
-            <a href="#propos" onClick={() => setIsMenuOpen(false)} className="block text-lg font-medium">Qui sommes-nous ?</a>
-            <a href="#services" onClick={() => setIsMenuOpen(false)} className="block text-lg font-medium">Nos Services</a>
-            
-            {/* --- NOUVEAU LIEN --- */}
-            <a href="#siege" onClick={() => setIsMenuOpen(false)} className="block text-lg font-medium">Notre Siège</a>
-            {/* -------------------- */}
 
-            {/* BOUTON 2 : Mobile */}
-            <button onClick={() => {setIsMenuOpen(false); openModal("Demander un devis");}} className="block text-lg font-medium text-orange-500">Demander un devis</button>
+        {/* --- MENU MOBILE (Version Smartphone) --- */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl">
+            <div className="px-4 pt-2 pb-6 space-y-2">
+              <a href="#home" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium">{t.nav_home}</a>
+              <a href="#services" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium">{t.nav_services}</a>
+              <a href="#projects" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium">{t.nav_projects}</a>
+              <a href="#acces-pro" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-teal-600 font-bold hover:bg-teal-50 rounded-lg">{t.nav_access}</a>
+              <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 font-medium">{t.nav_location}</a>
+              
+              <button onClick={() => { openModal('Mobile'); setIsMobileMenuOpen(false); }} className="w-full mt-4 bg-orange-500 text-white py-3 rounded-lg font-bold shadow-md">
+                Demander un Devis
+              </button>
+            </div>
           </div>
         )}
-      </nav>
+      </header>
+
 
       {/* --- HERO SECTION --- */}
       <section className="pt-32 pb-16 lg:pt-48 lg:pb-32 overflow-hidden bg-gradient-to-b from-white to-orange-50/30">
@@ -428,8 +486,56 @@ const App = () => {
           </div>
         </div>
       </section>
+
+{/* --- SECTION RÉALISATIONS (Nouveau) --- */}
+      <section id="projects" className="bg-gray-50 py-16 scroll-mt-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">{t.nav_projects}</h2>
+            <div className="w-20 h-1 bg-orange-500 mx-auto rounded-full"></div>
+            <p className="mt-4 text-gray-600 max-w-2xl mx-auto">Découvrez nos derniers chantiers livrés à travers la Côte d'Ivoire.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Projet 1 */}
+            <div className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer">
+              <img src="https://images.unsplash.com/photo-1613545325278-f24b0cae1224?q=80&w=1000" alt="Villa Moderne" className="w-full h-64 object-cover transform group-hover:scale-110 transition duration-500"/>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
+                <div>
+                  <h3 className="text-white font-bold text-xl">Villa Duplex - Abidjan</h3>
+                  <p className="text-gray-300 text-sm">Construction Clé en main</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Projet 2 */}
+            <div className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer">
+              <img src="https://images.unsplash.com/photo-1590644365607-1c5a38d07d99?q=80&w=1000" alt="Rénovation" className="w-full h-64 object-cover transform group-hover:scale-110 transition duration-500"/>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
+                <div>
+                  <h3 className="text-white font-bold text-xl">Rénovation Bureaux - Plateau</h3>
+                  <p className="text-gray-300 text-sm">Réhabilitation complète</p>
+                </div>
+              </div>
+            </div>
+
+             {/* Projet 3 */}
+             <div className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer">
+              <img src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1000" alt="Gros Oeuvre" className="w-full h-64 object-cover transform group-hover:scale-110 transition duration-500"/>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
+                <div>
+                  <h3 className="text-white font-bold text-xl">Lotissement - Yamoussoukro</h3>
+                  <p className="text-gray-300 text-sm">Voirie et Réseaux Divers</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
       {/* --- NOUVELLE SECTION : SIÈGE SOCIAL & MAP --- */}
-      <section id="siege" className="py-16 bg-white scroll-mt-24">
+      <section id="contact" className="bg-gray-50 py-16 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
             
@@ -498,11 +604,15 @@ const App = () => {
       {/* ... Section Siège Social ... */}
 
       {/* SYSTEME DE CONTRÔLE D'ACCÈS */}
-      <AccessControl />
+      {/* --- SECTION ESPACE PRO (Cible du lien #acces-pro) --- */}
+      <div id="acces-pro" className="bg-gray-50 py-16 scroll-mt-24">
+        <AccessControl />
+      </div>
 
       {/* Footer ... */}
 
       {/* --- FOOTER SOCIAL & CONTACT --- */}
+      <footer id="contact" className="bg-slate-900 text-white pt-16 pb-8"></footer>
       <section className="bg-gray-900 text-white pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
