@@ -336,18 +336,44 @@ const App = () => {
         </div>
 
         {/* --- MENU MOBILE (Version Smartphone) --- */}
+       {/* --- MENU MOBILE (Identique à l'ordinateur) --- */}
         {isMobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl">
-            <div className="px-4 pt-2 pb-6 space-y-2">
-              <a href="#home" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium">{t.nav_home}</a>
-              <a href="#services" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium">{t.nav_services}</a>
-              <a href="#projects" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium">{t.nav_projects}</a>
-              <a href="#acces-pro" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-teal-600 font-bold hover:bg-teal-50 rounded-lg">{t.nav_access}</a>
-              <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-gray-700 hover:bg-orange-50 font-medium">{t.nav_location}</a>
+          <div className="md:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl z-50 left-0">
+            <div className="px-4 pt-4 pb-6 space-y-2">
               
-              <button onClick={() => { openModal('Mobile'); setIsMobileMenuOpen(false); }} className="w-full mt-4 bg-orange-500 text-white py-3 rounded-lg font-bold shadow-md">
-                Demander un Devis
+              {/* 1. Accueil */}
+              <a href="#home" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
+                {t.nav_home}
+              </a>
+
+              {/* 2. Services */}
+              <a href="#services" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
+                {t.nav_services}
+              </a>
+
+              {/* 3. Réalisations */}
+              <a href="#projects" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
+                {t.nav_projects}
+              </a>
+
+              {/* 4. Notre Siège (Vers le footer/contact) */}
+              <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
+                {t.nav_location}
+              </a>
+
+              {/* 5. Espace Pro (Mis en valeur) */}
+              <a href="#acces-pro" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-teal-700 font-bold bg-teal-50 hover:bg-teal-100 rounded-lg flex items-center gap-2 border border-teal-100 mt-2">
+                <Users size={18}/> {t.nav_access}
+              </a>
+              
+              {/* 6. Le gros bouton Devis */}
+              <button 
+                onClick={() => { openModal('Demander un devis'); setIsMobileMenuOpen(false); }} 
+                className="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-bold shadow-md flex justify-center items-center gap-2 transition"
+              >
+                <PenTool size={18}/> {lang === 'fr' ? 'Demander un devis' : 'Request a Quote'}
               </button>
+
             </div>
           </div>
         )}
