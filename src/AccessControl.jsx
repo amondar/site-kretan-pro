@@ -13,6 +13,8 @@ const AccessControl = () => {
   const [employees, setEmployees] = useState([]);
   const [knowledge, setKnowledge] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [publicTeam, setPublicTeam] = useState([]);
+  const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '' });
   
   // Données Site Web
   const [promoData, setPromoData] = useState({ title: '', desc: '', discount: '', active: false, imageUrl: '', topBanner: '' });
@@ -32,6 +34,9 @@ const AccessControl = () => {
     // A. Logs
     const qLogs = query(collection(db, "logs"), orderBy("timestamp", "desc"));
     const unsubLogs = onSnapshot(qLogs, (snap) => setAccessLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    const qTeam = query(collection(db, "public_team"), orderBy("createdAt", "desc"));
+    const unsubTeam = onSnapshot(qTeam, (snap) => setPublicTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
     // B. Employés
     const qUsers = query(collection(db, "users"), orderBy("name", "asc"));
@@ -148,6 +153,17 @@ const AccessControl = () => {
     }
   };
   const handleDelete = async (col, id) => { if (window.confirm("Supprimer ?")) await deleteDoc(doc(db, col, id)); };
+
+// Ajouter un membre sur le site public
+  const handleAddPublicTeam = async (e) => {
+    e.preventDefault();
+    if(!newTeamMember.name) return alert("Le nom est obligatoire");
+    await addDoc(collection(db, "public_team"), { 
+        ...newTeamMember, 
+        createdAt: serverTimestamp() 
+    });
+    setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' }); // Reset
+  };
 
   // Ajouts
   const handleAddEmployee = async (e) => { e.preventDefault(); await addDoc(collection(db, "users"), { ...newEmp, code: newEmp.code.toUpperCase() }); setNewEmp({name:'', role:'Ouvrier', code:''}); };
@@ -300,7 +316,6 @@ const AccessControl = () => {
         )}        
         {view === 'ai' && <div className="bg-white p-6 rounded shadow"><h3 className="font-bold mb-4">Cerveau IA</h3><form onSubmit={handleAddRule} className="flex gap-2 mb-4"><input className="border p-2 rounded" placeholder="Mots clés..." value={newRule.keywords} onChange={e=>setNewRule({...newRule, keywords:e.target.value})}/><input className="border p-2 rounded flex-1" placeholder="Réponse..." value={newRule.response} onChange={e=>setNewRule({...newRule, response:e.target.value})}/><button className="bg-purple-500 text-white px-4 rounded">Apprendre</button></form><div>{knowledge.map(k=><div key={k.id} className="flex justify-between border-b p-2"><span><b>Si:</b> {k.keywords} -> <b>Dire:</b> {k.response}</span><button onClick={()=>handleDelete('chatbot_knowledge', k.id)}><Trash2 size={16} className="text-red-500"/></button></div>)}</div></div>}
 
-        {/* --- VUE SITE WEB (Celle qui nous intéresse) --- */}
         {view === 'website' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 
@@ -349,6 +364,37 @@ const AccessControl = () => {
                         <div className="md:col-span-2"><button className="w-full bg-blue-600 text-white font-bold py-2 rounded">Enregistrer les liens</button></div>
                     </form>
                 </div>
+                {/* 4. GESTION ÉQUIPE PUBLIQUE (PHOTOS & NOMS) */}
+                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-purple-600 lg:col-span-2">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-purple-800">
+                        👔 L'Équipe (Visible sur le site)
+                    </h3>
+                    
+                    {/* Formulaire */}
+                    <form onSubmit={handleAddPublicTeam} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-purple-50 p-4 rounded-lg">
+                        <input className="border p-2 rounded" placeholder="Nom (ex: M. KOUASSI)" value={newTeamMember.name} onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})} />
+                        <input className="border p-2 rounded" placeholder="Poste (ex: Directeur Général)" value={newTeamMember.role} onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})} />
+                        <input className="border p-2 rounded md:col-span-2" placeholder="Lien Photo (URL)" value={newTeamMember.imageUrl} onChange={e => setNewTeamMember({...newTeamMember, imageUrl: e.target.value})} />
+                        <textarea className="border p-2 rounded md:col-span-2" placeholder="Citation ou Description courte..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
+                        <button className="md:col-span-2 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700">Ajouter ce membre</button>
+                    </form>
+
+                    {/* Liste actuelle */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {publicTeam.map(member => (
+                            <div key={member.id} className="flex items-center gap-3 border p-2 rounded bg-white shadow-sm">
+                                <img src={member.imageUrl || 'https://via.placeholder.com/50'} className="w-10 h-10 rounded-full object-cover" alt="avatar" />
+                                <div className="flex-1">
+                                    <p className="font-bold text-sm">{member.name}</p>
+                                    <p className="text-xs text-gray-500">{member.role}</p>
+                                </div>
+                                <button onClick={() => handleDelete('public_team', member.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                            </div>
+                        ))}
+                        {publicTeam.length === 0 && <p className="text-gray-400 italic text-sm">Aucun membre affiché sur le site.</p>}
+                    </div>
+                </div>
+
             </div>
         )}
 

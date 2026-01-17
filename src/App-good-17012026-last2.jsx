@@ -1,10 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
-import { 
-  Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, 
-  MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram, Lock, 
-  MapPin, Phone, Mail, Star, Award, Clock, Shield, Briefcase, User 
-} from 'lucide-react';
+import { Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram, Lock, MapPin, Phone, Mail, Star } from 'lucide-react';
 import AccessControl from './AccessControl';
 import ReactGA from "react-ga4";
 
@@ -13,7 +9,6 @@ import { db } from './firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore'; 
 // ----------------------------------------------------
 import { translations } from './translations';
-import CookieConsent from './CookieConsent';
 
 // --- COMPOSANT ASSISTANT CHAT INTELLIGENT ---
 const ChatAssistant = () => {
@@ -123,7 +118,6 @@ const App = () => {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [teamList, setTeamList] = useState([]);
   
   // États dynamiques
   const [projectsList, setProjectsList] = useState([]);
@@ -161,11 +155,6 @@ const App = () => {
         const socialSnap = await getDoc(doc(db, "content", "social_links"));
         if (socialSnap.exists()) setSocials(socialSnap.data());
 
-        // 4. Charger l'Équipe Publique
-        const teamSnap = await getDocs(collection(db, "public_team"));
-        // Astuce : On trie pour afficher (optionnel, sinon l'ordre d'ajout)
-        setTeamList(teamSnap.docs.map(d => d.data()));
-
       } catch (err) { console.error("Erreur chargement contenu", err); }
     };
     fetchContent();
@@ -177,20 +166,7 @@ const App = () => {
   const openModal = (title) => {
     setModalTitle(title);
     setIsQuoteOpen(true);
-
-    // VÉRIFICATION DU CONSENTEMENT AVANT D'ENVOYER À GOOGLE
-    const consent = localStorage.getItem('kretan_cookie_consent');
-    if (consent === 'true') {
-        try {
-            ReactGA.event({
-                category: "Business",
-                action: "Clic Bouton Devis",
-                label: title 
-            });
-        } catch (e) {
-            // On ignore silencieusement si GA n'est pas initialisé
-        }
-    }
+    ReactGA.event({ category: "Business", action: "Clic Bouton Devis", label: title });
   };
 
   const colors = { primary: "bg-orange-500 hover:bg-orange-600", textPrimary: "text-orange-500", secondary: "text-teal-600", bgSecondary: "bg-teal-50" };
@@ -267,7 +243,6 @@ const App = () => {
                 {t.nav_home}
               </button>
               <a href="#services" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_services}</a>
-              <a href="#team" className="text-gray-600 hover:text-orange-500 font-medium transition">L'Équipe</a>
               <a href="#projects" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_projects}</a>
               <a href="#contact" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_location}</a>
             </nav>
@@ -295,9 +270,6 @@ const App = () => {
             <div className="px-4 pt-4 pb-6 space-y-2">
               <button onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setIsMobileMenuOpen(false); }} className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">{t.nav_home}</button>
               <a href="#services" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">{t.nav_services}</a>
-              <a href="#team" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
-                L'Équipe
-              </a>
               <a href="#projects" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">{t.nav_projects}</a>
               <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">{t.nav_location}</a>
               <button onClick={() => { openModal('Demander un devis'); setIsMobileMenuOpen(false); }} className="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-bold shadow-md flex justify-center items-center gap-2 transition">
@@ -334,22 +306,6 @@ const App = () => {
                 <div className="absolute bottom-4 right-4 bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-md">Pro+</div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* --- SECTION A: PARTENAIRES (Confiance) --- */}
-      <section className="bg-gray-100 border-b border-gray-200 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">
-            Ils nous font confiance pour leurs projets
-          </p>
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-            {/* Remplacer par des images <img src="..." /> plus tard */}
-            <span className="text-xl font-black text-gray-800 flex items-center gap-2"><Briefcase size={24}/> IMMO-IVOIRE</span>
-            <span className="text-xl font-black text-gray-800 flex items-center gap-2"><Home size={24}/> BATIR-PLUS</span>
-            <span className="text-xl font-black text-gray-800 flex items-center gap-2"><Truck size={24}/> TRANS-LOGISTIQUE</span>
-            <span className="text-xl font-black text-gray-800 flex items-center gap-2"><HardHat size={24}/> GROUPE BTP</span>
           </div>
         </div>
       </section>
@@ -416,51 +372,6 @@ const App = () => {
           </div>
         </div>
       </section>
-{/* --- SECTION B: POURQUOI NOUS CHOISIR --- */}
-      <section className="bg-teal-900 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold sm:text-4xl">Pourquoi KréTan Pro+ ?</h2>
-            <p className="mt-4 text-lg text-teal-100">La différence se fait dans les détails et l'engagement.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            
-            <div className="p-6 bg-teal-800 rounded-xl hover:bg-teal-700 transition duration-300">
-              <div className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Award size={28} className="text-white"/>
-              </div>
-              <h3 className="font-bold text-xl mb-2">Qualité Certifiée</h3>
-              <p className="text-sm text-teal-100">Matériaux de premier choix et respect strict des normes de construction ivoiriennes.</p>
-            </div>
-
-            <div className="p-6 bg-teal-800 rounded-xl hover:bg-teal-700 transition duration-300">
-              <div className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Clock size={28} className="text-white"/>
-              </div>
-              <h3 className="font-bold text-xl mb-2">Délais Respectés</h3>
-              <p className="text-sm text-teal-100">Un planning détaillé vous est remis au départ. Zéro mauvaise surprise sur la livraison.</p>
-            </div>
-
-            <div className="p-6 bg-teal-800 rounded-xl hover:bg-teal-700 transition duration-300">
-              <div className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Shield size={28} className="text-white"/>
-              </div>
-              <h3 className="font-bold text-xl mb-2">Garantie Totale</h3>
-              <p className="text-sm text-teal-100">Service après-vente réactif et garantie décennale sur nos ouvrages majeurs.</p>
-            </div>
-
-            <div className="p-6 bg-teal-800 rounded-xl hover:bg-teal-700 transition duration-300">
-              <div className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Users size={28} className="text-white"/>
-              </div>
-              <h3 className="font-bold text-xl mb-2">Équipe Expert</h3>
-              <p className="text-sm text-teal-100">Des ingénieurs et techniciens formés, encadrés par une direction expérimentée.</p>
-            </div>
-
-          </div>
-        </div>
-      </section>
 
       {/* --- RÉALISATIONS DYNAMIQUE --- */}
       <section id="projects" className="bg-gray-50 py-16 scroll-mt-24">
@@ -508,43 +419,6 @@ const App = () => {
               <iframe src="https://maps.google.com/maps?q=N'douci,%20Cote%20d'ivoire&t=&z=13&ie=UTF8&iwloc=&output=embed" width="100%" height="100%" style={{border:0}} allowFullScreen="" loading="lazy" title="Carte Siège KréTan Pro"></iframe>
               <div className="absolute bottom-4 left-4 bg-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold text-gray-800">📍 Siège KréTan Pro+</div>
             </div>
-          </div>
-        </div>
-      </section>
-{/* --- SECTION C: L'ÉQUIPE DIRIGEANTE --- */}
-      <section id="team" className="bg-gray-50 py-16 scroll-mt-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Une Direction Engagée</h2>
-            <div className="w-20 h-1 bg-orange-500 mx-auto rounded-full mt-4"></div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            
-            {/* Si la liste est vide, on affiche un message ou les exemples par défaut */}
-            {teamList.length === 0 && (
-                <div className="col-span-3 text-center text-gray-400 italic py-10">
-                    Chargement de l'équipe ou liste vide...
-                    <br/><span className="text-xs">Ajoutez des membres via l'Espace Pro.</span>
-                </div>
-            )}
-
-            {/* BOUCLE SUR L'ÉQUIPE DYNAMIQUE */}
-            {teamList.map((member, index) => (
-                <div key={index} className="text-center group">
-                  <div className="relative w-40 h-40 mx-auto mb-4 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg group-hover:border-orange-500 transition duration-300">
-                    <img 
-                        src={member.imageUrl || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"} 
-                        alt={member.name} 
-                        className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">{member.name}</h3>
-                  <p className="text-orange-600 font-medium text-sm uppercase tracking-wide mb-2">{member.role}</p>
-                  <p className="text-gray-500 text-sm px-4 italic">"{member.quote}"</p>
-                </div>
-            ))}
-
           </div>
         </div>
       </section>
@@ -681,8 +555,7 @@ const App = () => {
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
         <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-4 w-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] text-white justify-center items-center font-bold">1</span></span>
       </a>
-{/* --- GESTION COOKIES & GDPR --- */}
-      <CookieConsent />
+
     </div>
   );
 };
