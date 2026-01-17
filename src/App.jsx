@@ -5,7 +5,7 @@ import AccessControl from './AccessControl';
 import ReactGA from "react-ga4"; // N'oubliez pas l'import en haut
 // --- IMPORT OBLIGATOIRE POUR QUE L'IA FONCTIONNE ---
 import { db } from './firebase'; 
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore'; // Ajoutez doc et getDoc
 // ----------------------------------------------------
 import { translations } from './translations';
 
@@ -177,6 +177,28 @@ const App = () => {
   const showFlashBar = true; 
   const showPromoSection = true;
   
+// NOUVEAUX ÉTATS POUR LE CONTENU DYNAMIQUE
+  const [projectsList, setProjectsList] = useState([]);
+  const [activePromo, setActivePromo] = useState(null);
+
+  // CHARGER LE CONTENU DU SITE DEPUIS FIREBASE
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        // 1. Chantiers
+        const projSnap = await getDocs(collection(db, "projects"));
+        setProjectsList(projSnap.docs.map(d => d.data()));
+
+        // 2. Promo
+        const promoSnap = await getDoc(doc(db, "content", "promo_main"));
+        if (promoSnap.exists()) {
+          setActivePromo(promoSnap.data());
+        }
+      } catch (err) { console.error("Erreur chargement contenu", err); }
+    };
+    fetchContent();
+  }, []);
+
   // --- NOUVEAU : État pour le titre dynamique du formulaire ---
   const [modalTitle, setModalTitle] = useState("Parlez-nous de votre projet");
   
@@ -251,17 +273,17 @@ const App = () => {
   return (
     <div className="min-h-screen bg-white font-sans text-gray-600">
 
-      {/* --- BARRE FLASH (TOP BAR) --- */}
-      {showFlashBar && (
-        <div className="bg-red-600 text-white text-center py-2 px-4 text-sm font-bold z-[60] relative animate-pulse">
-          🔥 PROMO DU MOIS : -15% sur tous les travaux de peinture jusqu'au 30 Juin ! 
-          <span className="underline cursor-pointer ml-2" onClick={() => openModal("Promo Peinture -15%")}>
-            En profiter
-          </span>
+      {/* --- BANNIÈRE DU HAUT DYNAMIQUE (Top Bar) --- */}
+      {/* Elle ne s'affiche que s'il y a du texte dans le CMS */}
+      {activePromo && activePromo.topBanner && (
+        <div className="bg-teal-900 text-white text-center py-2 px-4 text-sm font-medium relative z-50">
+          <p className="animate-pulse">
+            <span className="bg-orange-500 text-xs font-bold px-2 py-0.5 rounded mr-2">INFO</span>
+            {activePromo.topBanner}
+          </p>
         </div>
       )}
-      
-     
+    
 
 {/* --- DÉBUT DU HEADER (Menu du haut) --- */}
       <header className="fixed w-full bg-white/95 backdrop-blur-sm shadow-md z-40 transition-all duration-300">
@@ -269,9 +291,11 @@ const App = () => {
           <div className="flex justify-between items-center h-20">
             
 {/* LOGO (Version Image) */}
-            <div className="flex-shrink-0 flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
-               
-               {/* Remplacez '/assets/logo.png' par le vrai nom de votre fichier si c'est différent */}
+           {/* LOGO (Clic = Retour haut de page) */}
+            <div 
+              className="flex-shrink-0 flex items-center gap-2 cursor-pointer" 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} // <--- Vérifiez cette ligne
+            >
                <img 
                  src="/assets/logo.png" 
                  alt="Logo KréTan Pro" 
@@ -284,7 +308,13 @@ const App = () => {
             {/* NAVIGATION ORDI (Caché sur mobile) */}
 {/* NAVIGATION ORDI */}
             <nav className="hidden md:flex space-x-6 items-center">
-              <a href="#home" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_home}</a>
+              {/* LIEN ACCUEIL (Modifié pour remonter tout en haut) */}
+              <button 
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
+                className="text-gray-600 hover:text-orange-500 font-medium transition bg-transparent border-none cursor-pointer"
+              >
+                {t.nav_home}
+              </button>
               <a href="#services" className="text-gray-600 hover:text-orange-500 font-medium transition">{t.nav_services}</a>
               
               {/* Je garde Réalisations car c'est utile pour le SEO, mais vous pouvez l'enlever si vous voulez */}
@@ -311,9 +341,17 @@ const App = () => {
                   FR
                 </button>
                 <div className="w-[1px] h-3 bg-gray-300 mx-1"></div>
+                {/* Bouton ANGLAIS (Désactivé temporairement) */}
                 <button 
-                  onClick={() => setLang('en')} 
-                  className={`px-2 py-1 rounded text-xs font-bold transition-all ${lang === 'en' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  /* AVANT (Code à réactiver plus tard) : 
+                     onClick={() => setLang('en')} 
+                  */
+                  
+                  // MAINTENANT (Message d'attente) :
+                  onClick={() => alert("La version anglaise sera disponible très prochainement ! \nEnglish version coming soon!")} 
+                  
+                  className={`px-2 py-1 rounded text-xs font-bold transition-all ${lang === 'en' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 cursor-not-allowed'}`}
+                  title="Bientôt disponible / Coming Soon"
                 >
                   EN
                 </button>
@@ -341,10 +379,16 @@ const App = () => {
           <div className="md:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl z-50 left-0">
             <div className="px-4 pt-4 pb-6 space-y-2">
               
-              {/* 1. Accueil */}
-              <a href="#home" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
+              {/* LIEN ACCUEIL MOBILE */}
+              <button 
+                onClick={() => { 
+                  window.scrollTo({ top: 0, behavior: 'smooth' }); 
+                  setIsMobileMenuOpen(false); 
+                }} 
+                className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition"
+              >
                 {t.nav_home}
-              </a>
+              </button>
 
               {/* 2. Services */}
               <a href="#services" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-medium transition">
@@ -414,57 +458,29 @@ const App = () => {
         </div>
       </section>
 
-      {/* --- SECTION PROMO / FLYER --- */}
-      {showPromoSection && (
-        <section className="py-12 bg-orange-600">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden lg:grid lg:grid-cols-2 lg:gap-4">
-              
-              {/* Côté Gauche : LE FLYER (Image) */}
-              <div className="relative h-64 lg:h-full bg-gray-200">
-                {/* --- LE CHANGEMENT EST ICI --- */}
-                <img 
-                  className="absolute inset-0 w-full h-full object-cover"
-                  // J'ai mis un nouveau lien d'image qui fonctionne :
-                  src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=1000&auto=format&fit=crop" 
-                  alt="Flyer Promo KréTan"
-                />
-                {/* Badge de réduction */}
-                <div className="absolute top-0 left-0 bg-yellow-400 text-red-700 text-xl font-black px-4 py-2 rounded-br-xl shadow-lg transform rotate-[-2deg]">
-                  -20%
-                </div>
-              </div>
-
-              {/* Côté Droit : Le Texte Vendeur */}
-              <div className="p-8 lg:p-12 flex flex-col justify-center">
-                <div className="uppercase tracking-wide text-sm text-orange-600 font-bold">Offre Limitée</div>
-                <h2 className="mt-2 text-3xl leading-8 font-extrabold text-gray-900 sm:text-4xl">
-                  Pack Rénovation "Spécial Rentrée"
-                </h2>
-                <p className="mt-4 text-lg text-gray-500">
-                  Ne laissez pas votre maison se dégrader. Pour tout devis signé avant la fin du mois, nous offrons le nettoyage complet de fin de chantier !
-                </p>
-                
-                <div className="mt-8 flex items-center gap-4">
-                  <button 
-                    onClick={() => openModal("Je veux l'offre Spéciale Rentrée")}
-                    className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-3 rounded-lg font-bold transition shadow-lg transform hover:scale-105"
-                  >
-                    J'en profite maintenant
-                  </button>
-                  <div className="text-sm text-gray-400 italic">
-                    *Conditions applicables
-                  </div>
-                </div>
-
-                {/* Compte à rebours visuel (Fake) */}
-                <div className="mt-6 flex items-center gap-2 text-sm font-medium text-gray-900">
-                  <span className="w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
-                  Il ne reste que 3 places disponibles !
-                </div>
-              </div>
-
-            </div>
+  
+      {/* --- SECTION PROMOTION DYNAMIQUE --- */}
+      {/* On n'affiche que si la case "Active" est cochée dans l'admin */}
+      {activePromo && activePromo.active && (
+        <section className="bg-orange-600 py-12 text-white relative overflow-hidden">
+          {/* Image de fond ou Flyer si disponible */}
+          {activePromo.imageUrl && (
+             <div className="absolute inset-0 opacity-20">
+               <img src={activePromo.imageUrl} className="w-full h-full object-cover" alt="Flyer Promo" />
+             </div>
+          )}
+          
+          <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
+            <h2 className="text-3xl font-bold mb-4 flex justify-center items-center gap-2">
+              <span className="bg-white text-orange-600 px-3 py-1 rounded-full text-sm font-extrabold uppercase animate-pulse">
+                {activePromo.discount}
+              </span>
+              {activePromo.title}
+            </h2>
+            <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">{activePromo.desc}</p>
+            <button onClick={() => openModal('Profiter de la promo')} className="bg-white text-orange-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition shadow-lg">
+              J'en profite maintenant !
+            </button>
           </div>
         </section>
       )}
@@ -513,48 +529,35 @@ const App = () => {
         </div>
       </section>
 
-{/* --- SECTION RÉALISATIONS (Nouveau) --- */}
+
+      {/* --- SECTION RÉALISATIONS DYNAMIQUE --- */}
       <section id="projects" className="bg-gray-50 py-16 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">{t.nav_projects}</h2>
             <div className="w-20 h-1 bg-orange-500 mx-auto rounded-full"></div>
-            <p className="mt-4 text-gray-600 max-w-2xl mx-auto">Découvrez nos derniers chantiers livrés à travers la Côte d'Ivoire.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Projet 1 */}
-            <div className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer">
-              <img src="https://images.unsplash.com/photo-1613545325278-f24b0cae1224?q=80&w=1000" alt="Villa Moderne" className="w-full h-64 object-cover transform group-hover:scale-110 transition duration-500"/>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
-                <div>
-                  <h3 className="text-white font-bold text-xl">Villa Duplex - Abidjan</h3>
-                  <p className="text-gray-300 text-sm">Construction Clé en main</p>
+            {/* Si la liste est vide, on affiche un message */}
+            {projectsList.length === 0 && (
+                <div className="col-span-3 text-center text-gray-500 italic">
+                    Aucune réalisation affichée pour le moment. Connectez-vous à l'espace pro pour en ajouter.
                 </div>
-              </div>
-            </div>
+            )}
 
-            {/* Projet 2 */}
-            <div className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer">
-              <img src="https://images.unsplash.com/photo-1590644365607-1c5a38d07d99?q=80&w=1000" alt="Rénovation" className="w-full h-64 object-cover transform group-hover:scale-110 transition duration-500"/>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
-                <div>
-                  <h3 className="text-white font-bold text-xl">Rénovation Bureaux - Plateau</h3>
-                  <p className="text-gray-300 text-sm">Réhabilitation complète</p>
+            {/* Boucle sur les projets venant de la base de données */}
+            {projectsList.map((proj, index) => (
+                <div key={index} className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer bg-white h-72">
+                  <img src={proj.imageUrl} alt={proj.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-500"/>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-6">
+                    <div>
+                      <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded mb-2 inline-block">{proj.type}</span>
+                      <h3 className="text-white font-bold text-xl">{proj.title}</h3>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-             {/* Projet 3 */}
-             <div className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer">
-              <img src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1000" alt="Gros Oeuvre" className="w-full h-64 object-cover transform group-hover:scale-110 transition duration-500"/>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
-                <div>
-                  <h3 className="text-white font-bold text-xl">Lotissement - Yamoussoukro</h3>
-                  <p className="text-gray-300 text-sm">Voirie et Réseaux Divers</p>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
