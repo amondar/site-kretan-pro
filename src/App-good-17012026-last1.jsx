@@ -464,48 +464,18 @@ const App = () => {
             </div>
           </div>
 
-          {/* --- BAS DU FOOTER (CORRIGÉ : CENTRÉ POUR ÉVITER LE CHATBOT) --- */}
-          <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-center items-center gap-8 text-gray-500 text-sm">
-            
-            {/* Copyright */}
-            <p onClick={handleSecretClick} className="cursor-default select-none hover:text-gray-400 transition" title="Tous droits réservés">
-              &copy; 2026 KréTan Pro+. Tous droits réservés.
-            </p>
-            
-            {/* LE BOUTON STAFF (Maintenant au centre, loin du coin droit) */}
-            <button 
-              onClick={() => setShowAdmin(true)} 
-              className="flex items-center gap-2 text-gray-500 hover:text-orange-500 transition-colors cursor-pointer group"
-              title="Accès réservé au personnel"
-            >
-              <div className="p-1 border border-gray-600 rounded group-hover:border-orange-500 transition">
-                 <Lock size={14} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider">Accès Staff</span>
-            </button>
-
+          <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-gray-500 text-sm">
+            <p onClick={handleSecretClick} className="cursor-default select-none hover:text-gray-400 transition" title="Tous droits réservés">© 2026 KréTan Pro+. Tous droits réservés.</p>
+            <button onClick={() => setShowAdmin(true)} className="flex items-center gap-1 hover:text-orange-500 transition-colors mt-2 md:mt-0 opacity-50 hover:opacity-100" title="Espace Personnel"><Lock size={14} /><span className="text-xs">Accès Staff</span></button>
           </div>
-          
         </div>
       </footer>
 
-     {/* --- MODALE ADMIN (Vérifiez que ce code est bien présent après le Footer) --- */}
+      {/* --- MODALE ADMIN (CACHÉE) --- */}
       {showAdmin && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex justify-center items-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative p-1">
-            
-            {/* Bouton pour fermer */}
-            <button 
-              onClick={() => setShowAdmin(false)} 
-              className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded shadow hover:bg-red-700 z-50"
-            >
-              Fermer
-            </button>
-            
-            {/* LE CMS */}
-            <AccessControl />
-            
-          </div>
+        <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-fadeIn">
+          <button onClick={() => setShowAdmin(false)} className="fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg z-50 hover:bg-red-700 transition">Fermer X</button>
+          <AccessControl />
         </div>
       )}
 
