@@ -536,7 +536,7 @@ const App = () => {
                     <img 
                         src={member.imageUrl || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"} 
                         alt={member.name} 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-top"
                     />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900">{member.name}</h3>

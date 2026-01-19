@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, LogIn, Users, Trash2, PlusCircle, Brain, Layout, Megaphone, Save, Facebook, Youtube, Linkedin, Instagram, Download } from 'lucide-react';
-import { db } from './firebase'; 
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
+import { Lock, LogIn, Users, Trash2, PlusCircle, Brain, Layout, Megaphone, Save, Facebook, Youtube, Linkedin, Instagram, Download, Upload} from 'lucide-react';
+
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc} from 'firebase/firestore';
+import { db} from './firebase'; // Ajoutez 'storage' ici
+// Ajoutez ces fonctions de stockage 👇
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; 
+
+
 
 const AccessControl = () => {
   const [view, setView] = useState('login'); // 'login', 'dashboard', 'users', 'ai', 'website'
@@ -16,6 +21,8 @@ const AccessControl = () => {
   const [publicTeam, setPublicTeam] = useState([]);
   const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '' });
   
+  const [imageFile, setImageFile] = useState(null); // Le fichier sélectionné
+  const [isUploading, setIsUploading] = useState(false); // Pour le sablier
   // Données Site Web
   const [promoData, setPromoData] = useState({ title: '', desc: '', discount: '', active: false, imageUrl: '', topBanner: '' });
   
@@ -88,6 +95,47 @@ const AccessControl = () => {
     setTimeout(() => setFeedback({ type: '', msg: '' }), 4000);
   };
 
+// Fonction pour envoyer l'image sur le Cloud
+  // Fonction pour envoyer l'image sur CLOUDINARY (Gratuit & Sans CB)
+  const uploadImage = async (file) => {
+    if (!file) return null;
+    
+    // Configuration
+    const cloudName = "dsrjqutzc"; // ex: kretanpro
+    const uploadPreset = "my4mitws"; // ex: ml_default (celui en mode Unsigned)
+
+    // Préparation des données
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
+    setIsUploading(true);
+    try {
+      // Envoi vers Cloudinary
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      setIsUploading(false);
+      
+      if (data.secure_url) {
+          return data.secure_url; // On récupère le lien https://...
+      } else {
+          alert("Erreur Cloudinary : " + data.error?.message);
+          return null;
+      }
+
+    } catch (error) {
+      console.error("Erreur upload:", error);
+      setIsUploading(false);
+      alert("Erreur de connexion lors de l'envoi");
+      return null;
+    }
+  };
+
   // --- 2. ACTIONS ---
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -158,11 +206,24 @@ const AccessControl = () => {
   const handleAddPublicTeam = async (e) => {
     e.preventDefault();
     if(!newTeamMember.name) return alert("Le nom est obligatoire");
+
+    let finalImageUrl = newTeamMember.imageUrl; // Par défaut, on garde le lien texte s'il y en a un
+
+    // Si un fichier local a été choisi, on l'upload d'abord
+    if (imageFile) {
+        const url = await uploadImage(imageFile);
+        if (url) finalImageUrl = url;
+    }
+
     await addDoc(collection(db, "public_team"), { 
         ...newTeamMember, 
+        imageUrl: finalImageUrl, // On utilise le nouveau lien
         createdAt: serverTimestamp() 
     });
-    setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' }); // Reset
+
+    // Reset du formulaire
+    setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' });
+    setImageFile(null); // On vide le fichier
   };
 
   // Ajouts
@@ -371,12 +432,41 @@ const AccessControl = () => {
                     </h3>
                     
                     {/* Formulaire */}
+                    {/* Formulaire MODIFIÉ */}
                     <form onSubmit={handleAddPublicTeam} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-purple-50 p-4 rounded-lg">
-                        <input className="border p-2 rounded" placeholder="Nom (ex: M. KOUASSI)" value={newTeamMember.name} onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})} />
-                        <input className="border p-2 rounded" placeholder="Poste (ex: Directeur Général)" value={newTeamMember.role} onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})} />
-                        <input className="border p-2 rounded md:col-span-2" placeholder="Lien Photo (URL)" value={newTeamMember.imageUrl} onChange={e => setNewTeamMember({...newTeamMember, imageUrl: e.target.value})} />
-                        <textarea className="border p-2 rounded md:col-span-2" placeholder="Citation ou Description courte..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
-                        <button className="md:col-span-2 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700">Ajouter ce membre</button>
+                        
+                        <input className="border p-2 rounded" placeholder="Nom" value={newTeamMember.name} onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})} />
+                        <input className="border p-2 rounded" placeholder="Poste" value={newTeamMember.role} onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})} />
+                        
+                        {/* 👇 NOUVEAU : CHOIX DU FICHIER */}
+                        <div className="md:col-span-2 flex gap-2 items-center">
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Choisir une photo locale :</label>
+                                <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    onChange={(e) => setImageFile(e.target.files[0])}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200"
+                                />
+                            </div>
+                            <span className="text-gray-400 font-bold">OU</span>
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Lien direct (URL) :</label>
+                                <input 
+                                    className="border p-2 rounded w-full" 
+                                    placeholder="https://..." 
+                                    value={newTeamMember.imageUrl} 
+                                    onChange={e => setNewTeamMember({...newTeamMember, imageUrl: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+
+                        <textarea className="border p-2 rounded md:col-span-2" placeholder="Citation..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
+                        
+                        <button disabled={isUploading} className="md:col-span-2 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700 flex justify-center items-center gap-2">
+                            {isUploading ? "Envoi en cours..." : "Ajouter ce membre"}
+                            {!isUploading && <Upload size={18}/>}
+                        </button>
                     </form>
 
                     {/* Liste actuelle */}
