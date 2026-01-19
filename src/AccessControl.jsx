@@ -21,8 +21,13 @@ const AccessControl = () => {
   const [publicTeam, setPublicTeam] = useState([]);
   const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '' });
   
-  const [imageFile, setImageFile] = useState(null); // Le fichier sélectionné
-  const [isUploading, setIsUploading] = useState(false); // Pour le sablier
+  // ...
+  const [imageFile, setImageFile] = useState(null); // Pour l'équipe
+  // 👇 AJOUTEZ CELUI-CI
+  const [projectImageFile, setProjectImageFile] = useState(null); // Pour les projets
+  const [isUploading, setIsUploading] = useState(false);
+  // ...
+
   // Données Site Web
   const [promoData, setPromoData] = useState({ title: '', desc: '', discount: '', active: false, imageUrl: '', topBanner: '' });
   
@@ -229,7 +234,31 @@ const AccessControl = () => {
   // Ajouts
   const handleAddEmployee = async (e) => { e.preventDefault(); await addDoc(collection(db, "users"), { ...newEmp, code: newEmp.code.toUpperCase() }); setNewEmp({name:'', role:'Ouvrier', code:''}); };
   const handleAddRule = async (e) => { e.preventDefault(); await addDoc(collection(db, "chatbot_knowledge"), { keywords: newRule.keywords.toLowerCase(), response: newRule.response, createdAt: serverTimestamp() }); setNewRule({keywords:'', response:''}); };
-  const handleAddProject = async (e) => { e.preventDefault(); await addDoc(collection(db, "projects"), { ...newProject, createdAt: serverTimestamp() }); setNewProject({title:'', type:'Construction', imageUrl:''}); };
+  
+  // Ajouter un projet (Avec Upload Cloudinary)
+  const handleAddProject = async (e) => {
+    e.preventDefault();
+    
+    // On décide quelle image utiliser
+    let finalImageUrl = newProject.imageUrl; // Par défaut, le lien texte
+
+    // Si un fichier local est choisi, on l'upload d'abord
+    if (projectImageFile) {
+        const url = await uploadImage(projectImageFile); // On réutilise votre fonction magique !
+        if (url) finalImageUrl = url;
+    }
+
+    // On sauvegarde dans la base de données
+    await addDoc(collection(db, "projects"), { 
+        ...newProject, 
+        imageUrl: finalImageUrl, // On utilise le bon lien
+        createdAt: serverTimestamp() 
+    });
+
+    // Remise à zéro du formulaire
+    setNewProject({ title: '', type: 'Gros Œuvre', imageUrl: '' });
+    setProjectImageFile(null); // On vide le fichier sélectionné
+  };
   
   // Mises à jour Site
   const handleUpdatePromo = async (e) => { e.preventDefault(); await setDoc(doc(db, "content", "promo_main"), promoData); alert("Promo mise à jour !"); };
@@ -397,11 +426,44 @@ const AccessControl = () => {
                 {/* 2. CHANTIERS */}
                 <div className="bg-white p-6 rounded-xl shadow border-t-4 border-teal-500">
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Layout className="text-teal-500"/> Portfolio</h3>
-                    <form onSubmit={handleAddProject} className="space-y-3 mb-4">
-                        <input className="w-full border p-2 rounded" placeholder="Titre Chantier" value={newProject.title} onChange={e => setNewProject({...newProject, title: e.target.value})} />
-                        <select className="w-full border p-2 rounded" value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})}><option>Construction</option><option>Rénovation</option><option>Voirie</option></select>
-                        <input className="w-full border p-2 rounded" placeholder="Image URL" value={newProject.imageUrl} onChange={e => setNewProject({...newProject, imageUrl: e.target.value})} />
-                        <button className="w-full bg-teal-600 text-white font-bold py-2 rounded">Ajouter Photo</button>
+                    
+                    <form onSubmit={handleAddProject} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-teal-50 p-4 rounded-lg">
+                        <input className="border p-2 rounded" placeholder="Titre du projet (ex: Villa Assinie)" value={newProject.title} onChange={e => setNewProject({...newProject, title: e.target.value})} />
+                        
+                        <select className="border p-2 rounded" value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})}>
+                            <option>Gros Œuvre</option>
+                            <option>Finition</option>
+                            <option>Rénovation</option>
+                            <option>Route / VRD</option>
+                        </select>
+
+                        {/* 👇 LE BLOC DOUBLE CHOIX (FICHIER ou LIEN) */}
+                        <div className="md:col-span-2 flex gap-2 items-center">
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Photo depuis l'ordi :</label>
+                                <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    onChange={(e) => setProjectImageFile(e.target.files[0])}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200"
+                                />
+                            </div>
+                            <span className="text-gray-400 font-bold">OU</span>
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Lien internet :</label>
+                                <input 
+                                    className="border p-2 rounded w-full" 
+                                    placeholder="https://..." 
+                                    value={newProject.imageUrl} 
+                                    onChange={e => setNewProject({...newProject, imageUrl: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+
+                        <button disabled={isUploading} className="md:col-span-2 bg-teal-600 text-white font-bold py-2 rounded hover:bg-teal-700 flex justify-center items-center gap-2">
+                            {isUploading ? "Envoi de la photo..." : "Ajouter ce projet"}
+                            {!isUploading && <Upload size={18}/>}
+                        </button>
                     </form>
                     <div className="max-h-40 overflow-y-auto">{projects.map(p=><div key={p.id} className="flex justify-between border-b p-1"><span className="text-sm">{p.title}</span><button onClick={()=>handleDelete('projects', p.id)}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
                 </div>
