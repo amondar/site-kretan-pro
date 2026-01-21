@@ -10,7 +10,8 @@ import ReactGA from "react-ga4";
 
 // --- IMPORT OBLIGATOIRE POUR QUE L'IA FONCTIONNE ---
 import { db } from './firebase'; 
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore'; 
+import { collection, addDoc, getDocs, getDoc, doc, onSnapshot } from "firebase/firestore";
+
 // ----------------------------------------------------
 import { translations } from './translations';
 import CookieConsent from './CookieConsent';
@@ -127,12 +128,13 @@ const App = () => {
   
   // États dynamiques
   const [projectsList, setProjectsList] = useState([]);
-  const [activePromo, setActivePromo] = useState(null);
   const [socials, setSocials] = useState({});
 
   // État Admin caché
   const [showAdmin, setShowAdmin] = useState(false);
   const [secretClicks, setSecretClicks] = useState(0);
+
+  const [livePromo, setLivePromo] = useState(null);
 
   // Langue
   const [lang, setLang] = useState('fr'); 
@@ -155,9 +157,6 @@ const App = () => {
         const projSnap = await getDocs(collection(db, "projects"));
         setProjectsList(projSnap.docs.map(d => d.data()));
 
-        const promoSnap = await getDoc(doc(db, "content", "promo_main"));
-        if (promoSnap.exists()) setActivePromo(promoSnap.data());
-
         const socialSnap = await getDoc(doc(db, "content", "social_links"));
         if (socialSnap.exists()) setSocials(socialSnap.data());
 
@@ -165,6 +164,16 @@ const App = () => {
         const teamSnap = await getDocs(collection(db, "public_team"));
         // Astuce : On trie pour afficher (optionnel, sinon l'ordre d'ajout)
         setTeamList(teamSnap.docs.map(d => d.data()));
+
+        // 5. Charger la Promo en direct (Live)
+       // On écoute le document "content/promo"
+        const unsubscribe = onSnapshot(doc(db, "content", "promo"), (docSnap) => {
+          if (docSnap.exists()) {
+            setLivePromo(docSnap.data()); // On met à jour la variable
+          }
+        });
+
+        return () => unsubscribe(); // Nettoyage quand on quitte
 
       } catch (err) { console.error("Erreur chargement contenu", err); }
     };
@@ -242,14 +251,11 @@ const App = () => {
   return (
     <div className="min-h-screen bg-white font-sans text-gray-600">
 
-      {/* --- BANNIÈRE DU HAUT --- */}
-      {activePromo && activePromo.topBanner && (
-        <div className="bg-teal-900 text-white text-center py-2 px-4 text-sm font-medium relative z-50">
-          <p className="animate-pulse">
-            <span className="bg-orange-500 text-xs font-bold px-2 py-0.5 rounded mr-2">INFO</span>
-            {activePromo.topBanner}
-          </p>
-        </div>
+      {/* On affiche le bandeau seulement si la promo est active ET qu'il y a du texte */}
+      {livePromo?.active && livePromo?.text && (
+          <div className="bg-gray-900 text-white text-center py-2 px-4 text-sm font-medium animate-pulse">
+              {livePromo.text}
+          </div>
       )}
 
       {/* --- HEADER --- */}
@@ -354,23 +360,29 @@ const App = () => {
         </div>
       </section>
 
-      {/* --- PROMO --- */}
-      {activePromo && activePromo.active && (
-        <section className="bg-orange-600 py-12 text-white relative overflow-hidden">
-          {activePromo.imageUrl && (
-             <div className="absolute inset-0 opacity-20">
-               <img src={activePromo.imageUrl} className="w-full h-full object-cover" alt="Flyer Promo" />
-             </div>
-          )}
-          <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
-            <h2 className="text-3xl font-bold mb-4 flex justify-center items-center gap-2">
-              <span className="bg-white text-orange-600 px-3 py-1 rounded-full text-sm font-extrabold uppercase animate-pulse">{activePromo.discount}</span>
-              {activePromo.title}
-            </h2>
-            <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">{activePromo.desc}</p>
-            <button onClick={() => openModal('Profiter de la promo')} className="bg-white text-orange-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition shadow-lg">J'en profite maintenant !</button>
-          </div>
-        </section>
+      {/* --- SECTION PROMO DYNAMIQUE --- */}
+      {livePromo?.active && (
+        <div className="bg-orange-600 text-white p-8 rounded-xl my-8 text-center relative overflow-hidden group">
+            {/* Image de fond (Si elle existe) */}
+            {livePromo.bgImage && (
+                <img src={livePromo.bgImage} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:scale-105 transition duration-700" alt="Promo" />
+            )}
+            
+            <div className="relative z-10">
+                <span className="bg-white text-orange-600 font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wider mb-2 inline-block">
+                    {livePromo.discount || "Offre Spéciale"}
+                </span>
+                <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
+                    {livePromo.title || "Grande Promotion en cours !"}
+                </h2>
+                <p className="text-lg max-w-2xl mx-auto mb-6 opacity-90">
+                    {livePromo.description}
+                </p>
+                <button onClick={() => openModal('Promo Web')} className="bg-white text-orange-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition shadow-lg transform hover:-translate-y-1">
+                    J'en profite maintenant
+                </button>
+            </div>
+        </div>
       )}
 
       {/* --- QUI SOMMES NOUS --- */}
@@ -506,6 +518,8 @@ const App = () => {
             </div>
             <div className="relative h-96 w-full rounded-2xl shadow-xl overflow-hidden border-4 border-gray-100">
               <iframe src="https://maps.google.com/maps?q=N'douci,%20Cote%20d'ivoire&t=&z=13&ie=UTF8&iwloc=&output=embed" width="100%" height="100%" style={{border:0}} allowFullScreen="" loading="lazy" title="Carte Siège KréTan Pro"></iframe>
+              {/* Remplacez http par https */}
+              <iframe src="https://maps.google.com/maps?q=N'douci&t=&z=13&ie=UTF8&iwloc=&output=embed" width="100%" height="100%" style={{border:0}} allowFullScreen="" loading="lazy" title="Carte Siège KréTan Pro"></iframe>
               <div className="absolute bottom-4 left-4 bg-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold text-gray-800">📍 Siège KréTan Pro+</div>
             </div>
           </div>

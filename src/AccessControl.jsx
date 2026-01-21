@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, LogIn, Users, Trash2, PlusCircle, Brain, Layout, Megaphone, Save, Facebook, Youtube, Linkedin, Instagram, Download, Upload} from 'lucide-react';
+import {  Menu, X , Lock, LogIn, Users, Trash2, PlusCircle, Brain, Layout, Megaphone, Save, Facebook, Youtube, Linkedin, Instagram, Download, Upload} from 'lucide-react';
 
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc} from 'firebase/firestore';
+// Remplacez les imports existants par ceux-ci :
+import { 
+  collection, addDoc, query, orderBy, onSnapshot, deleteDoc, 
+  doc, updateDoc, serverTimestamp, 
+  getDoc, setDoc // 👈 INDISPENSABLES POUR LA PROMO
+} from 'firebase/firestore';
+
 import { db} from './firebase'; // Ajoutez 'storage' ici
-// Ajoutez ces fonctions de stockage 👇
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; 
 
 
 
@@ -26,10 +30,12 @@ const AccessControl = () => {
   // 👇 AJOUTEZ CELUI-CI
   const [projectImageFile, setProjectImageFile] = useState(null); // Pour les projets
   const [isUploading, setIsUploading] = useState(false);
+
+  
   // ...
 
   // Données Site Web
-  const [promoData, setPromoData] = useState({ title: '', desc: '', discount: '', active: false, imageUrl: '', topBanner: '' });
+  //const [promoData, setPromoData] = useState({ title: '', desc: '', discount: '', active: false, imageUrl: '', topBanner: '' });
   
   // CORRECTION : On initialise bien toutes les clés ici
   const [socialLinks, setSocialLinks] = useState({ facebook: '', youtube: '', linkedin: '', instagram: '' });
@@ -38,6 +44,18 @@ const AccessControl = () => {
   const [newEmp, setNewEmp] = useState({ name: '', role: 'Ouvrier', code: '' });
   const [newRule, setNewRule] = useState({ keywords: '', response: '' });
   const [newProject, setNewProject] = useState({ title: '', type: 'Construction', imageUrl: '' });
+
+  const [promoImageFile, setPromoImageFile] = useState(null); // Promo
+ // On déclare TOUS les champs (Titre, Réduction, Description...)
+const [promo, setPromo] = useState({ 
+      active: false, 
+      text: '',        // 👈 C'est lui le "Bandeau Haut de page"
+      title: '',       // Le Titre de la fenêtre
+      discount: '',    // Le -XX%
+      description: '', // La description
+      bgImage: ''      // L'image
+  });
+  
 
   const MASTER_KEY = "KRETAN2026"; 
 
@@ -63,13 +81,16 @@ const AccessControl = () => {
     const unsubProjects = onSnapshot(qProjects, (snap) => setProjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
     // E. Promo
+// Charger la PROMO depuis Firebase au démarrage
     const loadPromo = async () => {
         try {
-            const docRef = doc(db, "content", "promo_main");
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) setPromoData(docSnap.data());
-        } catch (e) { console.error("Erreur promo", e); }
+            const docSnap = await getDoc(doc(db, "content", "promo"));
+            if (docSnap.exists()) {
+                setPromo(docSnap.data());
+            }
+        } catch (e) { console.log("Création de la promo par défaut..."); }
     };
+    loadPromo();
 
     // F. Réseaux Sociaux (AVEC CORRECTION DE FUSION)
     const loadSocials = async () => {
@@ -261,7 +282,37 @@ const AccessControl = () => {
   };
   
   // Mises à jour Site
-  const handleUpdatePromo = async (e) => { e.preventDefault(); await setDoc(doc(db, "content", "promo_main"), promoData); alert("Promo mise à jour !"); };
+  
+  // Mettre à jour la promo (Avec Upload Cloudinary)
+  // --- FONCTION DE MISE À JOUR PROMO (Avec Cloudinary) ---
+  const handleUpdatePromo = async (e) => {
+    e.preventDefault();
+    
+    // 1. Quelle image on garde ? (Celle d'avant ou vide)
+    let finalImageUrl = promo.bgImage || ""; 
+
+    // 2. Si un nouveau fichier est choisi sur l'ordi, on l'envoie sur Cloudinary
+    if (promoImageFile) {
+        // On utilise la fonction uploadImage que vous avez déjà créée
+        const url = await uploadImage(promoImageFile); 
+        if (url) finalImageUrl = url;
+    }
+
+    // 3. On sauvegarde tout dans Firebase
+    try {
+        await setDoc(doc(db, "content", "promo"), { 
+            ...promo, 
+            bgImage: finalImageUrl 
+        }, { merge: true });
+        
+        alert("✅ Promotion mise à jour avec succès !");
+        setPromoImageFile(null); // On vide le fichier
+    } catch (error) {
+        console.error("Erreur:", error);
+        alert("Erreur lors de la sauvegarde.");
+    }
+  };
+  
   const handleUpdateSocials = async (e) => { e.preventDefault(); await setDoc(doc(db, "content", "social_links"), socialLinks); alert("Réseaux sociaux mis à jour !"); };
 
   // Export
@@ -404,22 +455,107 @@ const AccessControl = () => {
             </div>
           </div>
         )}        
-        {view === 'ai' && <div className="bg-white p-6 rounded shadow"><h3 className="font-bold mb-4">Cerveau IA</h3><form onSubmit={handleAddRule} className="flex gap-2 mb-4"><input className="border p-2 rounded" placeholder="Mots clés..." value={newRule.keywords} onChange={e=>setNewRule({...newRule, keywords:e.target.value})}/><input className="border p-2 rounded flex-1" placeholder="Réponse..." value={newRule.response} onChange={e=>setNewRule({...newRule, response:e.target.value})}/><button className="bg-purple-500 text-white px-4 rounded">Apprendre</button></form><div>{knowledge.map(k=><div key={k.id} className="flex justify-between border-b p-2"><span><b>Si:</b> {k.keywords} -> <b>Dire:</b> {k.response}</span><button onClick={()=>handleDelete('chatbot_knowledge', k.id)}><Trash2 size={16} className="text-red-500"/></button></div>)}</div></div>}
+        {view === 'ai' && <div className="bg-white p-6 rounded shadow"><h3 className="font-bold mb-4">Cerveau IA</h3><form onSubmit={handleAddRule} className="flex gap-2 mb-4"><input className="border p-2 rounded" placeholder="Mots clés..." value={newRule.keywords} onChange={e=>setNewRule({...newRule, keywords:e.target.value})}/><input className="border p-2 rounded flex-1" placeholder="Réponse..." value={newRule.response} onChange={e=>setNewRule({...newRule, response:e.target.value})}/><button className="bg-purple-500 text-white px-4 rounded">Apprendre</button></form><div>{knowledge.map(k=><div key={k.id} className="flex justify-between border-b p-2"><span><b>Si:</b> {k.keywords} {'->'} <b>Dire:</b> {k.response}</span><button onClick={()=>handleDelete('chatbot_knowledge', k.id)}><Trash2 size={16} className="text-red-500"/></button></div>)}</div></div>}
 
         {view === 'website' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 
-                {/* 1. PROMO */}
-                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-red-500">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Megaphone className="text-red-500"/> Promo</h3>
-                    <form onSubmit={handleUpdatePromo} className="space-y-3">
-                        <input className="w-full border p-2 rounded bg-teal-50" placeholder="Bandeau Haut de page..." value={promoData.topBanner||''} onChange={e => setPromoData({...promoData, topBanner: e.target.value})} />
-                        <div className="flex items-center gap-2"><input type="checkbox" checked={promoData.active} onChange={e => setPromoData({...promoData, active: e.target.checked})} /><label>Activer Promo</label></div>
-                        <input className="w-full border p-2 rounded" placeholder="Titre" value={promoData.title} onChange={e => setPromoData({...promoData, title: e.target.value})} />
-                        <input className="w-full border p-2 rounded" placeholder="-XX%" value={promoData.discount} onChange={e => setPromoData({...promoData, discount: e.target.value})} />
-                        <textarea className="w-full border p-2 rounded" placeholder="Description" value={promoData.desc} onChange={e => setPromoData({...promoData, desc: e.target.value})} />
-                        <input className="w-full border p-2 rounded" placeholder="Image URL" value={promoData.imageUrl} onChange={e => setPromoData({...promoData, imageUrl: e.target.value})} />
-                        <button className="w-full bg-red-600 text-white font-bold py-2 rounded">Mettre à jour Promo</button>
+                {/* 1. GESTION PROMOTION (VERSION FINALE COMPLETE) */}
+                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-orange-500 lg:col-span-2">
+                    
+                    {/* EN-TÊTE : TITRE + SWITCH D'ACTIVATION */}
+                    <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-100">
+                        <h3 className="font-bold text-lg flex items-center gap-2 text-orange-800">
+                            📢 Gestion de la Promotion
+                        </h3>
+                        
+                        {/* LE BOUTON "ACTIVER PROMO" (Le Flag) */}
+                        <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-lg border">
+                             <span className="text-sm font-bold text-gray-700">Activer la Promo :</span>
+                             <button 
+                                type="button"
+                                onClick={() => setPromo({...promo, active: !promo.active})}
+                                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${promo?.active ? 'bg-green-500' : 'bg-gray-300'}`}
+                             >
+                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${promo?.active ? 'translate-x-6' : ''}`} />
+                             </button>
+                        </div>
+                    </div>
+                    
+                    <form onSubmit={handleUpdatePromo} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        
+                        {/* 1. BANDEAU HAUT DE PAGE (Le champ manquant) */}
+                        <div className="md:col-span-2 bg-green-50 p-3 rounded border border-green-200">
+                            <label className="block text-xs font-bold text-green-800 mb-1">🟢 Texte du Bandeau (Tout en haut du site) :</label>
+                            <input 
+                                className="border p-2 rounded w-full text-sm" 
+                                placeholder="Ex: Livraison gratuite jusqu'à ce soir..." 
+                                value={promo?.text || ''} 
+                                onChange={e => setPromo({...promo, text: e.target.value})} 
+                            />
+                        </div>
+
+                        {/* 2. TITRE (Fenêtre Popup) */}
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Titre Principal :</label>
+                            <input 
+                                className="border p-2 rounded w-full" 
+                                placeholder="Ex: Grande Promo Tabaski" 
+                                value={promo?.title || ''} 
+                                onChange={e => setPromo({...promo, title: e.target.value})} 
+                            />
+                        </div>
+
+                        {/* 3. RÉDUCTION (%) */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Réduction (-XX%) :</label>
+                            <input 
+                                className="border p-2 rounded w-full" 
+                                placeholder="-20%" 
+                                value={promo?.discount || ''} 
+                                onChange={e => setPromo({...promo, discount: e.target.value})} 
+                            />
+                        </div>
+
+                        {/* 4. DESCRIPTION */}
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Description détaillée :</label>
+                            <textarea 
+                                className="border p-2 rounded w-full h-20" 
+                                placeholder="Ex: Valable sur tous les travaux..." 
+                                value={promo?.description || ''} 
+                                onChange={e => setPromo({...promo, description: e.target.value})} 
+                            />
+                        </div>
+                        
+                        {/* 5. IMAGE (DOUBLE CHOIX) */}
+                        <div className="md:col-span-2 flex flex-col md:flex-row gap-4 items-center mt-2 pt-4 border-t border-dashed border-gray-300">
+                            <div className="flex-1 w-full">
+                                <label className="block text-xs font-bold text-orange-600 mb-1">📸 Photo depuis l'ordi :</label>
+                                <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    onChange={(e) => setPromoImageFile(e.target.files[0])}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200 cursor-pointer"
+                                />
+                            </div>
+                            <span className="text-gray-400 font-bold">OU</span>
+                            <div className="flex-1 w-full">
+                                <label className="block text-xs font-bold text-gray-600 mb-1">🌐 Lien URL (Internet) :</label>
+                                <input 
+                                    className="border p-2 rounded w-full text-sm bg-gray-50" 
+                                    placeholder="https://..." 
+                                    value={promo?.bgImage || ''} 
+                                    onChange={e => setPromo({...promo, bgImage: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+
+                        {/* BOUTON VALIDATION */}
+                        <button disabled={isUploading} className="md:col-span-2 bg-gradient-to-r from-orange-600 to-orange-500 text-white font-bold py-3 rounded-lg hover:from-orange-700 hover:to-orange-600 flex justify-center items-center gap-2 mt-4 shadow-md">
+                             {isUploading ? "Envoi en cours..." : "Sauvegarder la Promotion"}
+                             {!isUploading && <Upload size={18}/>}
+                        </button>
                     </form>
                 </div>
 
