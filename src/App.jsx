@@ -380,10 +380,23 @@ const App = () => {
 
                     <div className="mt-10 flex justify-end items-center gap-4">
                         <div className="text-right">
-                            <p className="font-bold text-gray-900 text-lg">{liveLetter.signature}</p>
-                            <p className="text-orange-500 text-xs uppercase font-bold tracking-wider">KréTan Pro+</p>
+                            {/* 1. LE TITRE (Fixe) */}
+                            <p className="font-bold text-gray-700 text-sm uppercase tracking-wide">
+                                Directeur Général
+                            </p>
+                            
+                            {/* 2. LE NOM (Vient du CMS) */}
+                            <p className="font-black text-gray-900 text-xl mb-1">
+                                {liveLetter.signature}
+                            </p>
+                            
+                            {/* 3. L'ENTREPRISE */}
+                            <p className="text-orange-500 text-xs uppercase font-bold tracking-wider">
+                                KréTan Pro+
+                            </p>
                         </div>
-                        {/* Emplacement pour une signature image si besoin plus tard */}
+                        
+                        {/* L'Icône Plume */}
                         <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
                              <PenTool size={20} />
                         </div>
