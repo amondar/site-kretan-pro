@@ -55,6 +55,15 @@ const [promo, setPromo] = useState({
       description: '', // La description
       bgImage: ''      // L'image
   });
+
+  // 👇 AJOUTEZ CELLE-CI POUR LA LETTRE OUVERTE
+  const [letter, setLetter] = useState({ 
+      active: false, 
+      title: 'Lettre aux Partenaires', 
+      content: '', 
+      signature: 'La Direction',
+      date: new Date().toLocaleDateString()
+  });
   
 
   const MASTER_KEY = "KRETAN2026"; 
@@ -91,6 +100,15 @@ const [promo, setPromo] = useState({
         } catch (e) { console.log("Création de la promo par défaut..."); }
     };
     loadPromo();
+
+// Charger la LETTRE OUVERTE
+    const loadLetter = async () => {
+        try {
+            const docSnap = await getDoc(doc(db, "content", "open_letter"));
+            if (docSnap.exists()) setLetter(docSnap.data());
+        } catch (e) { console.log("Pas de lettre encore"); }
+    };
+    loadLetter();
 
     // F. Réseaux Sociaux (AVEC CORRECTION DE FUSION)
     const loadSocials = async () => {
@@ -317,6 +335,18 @@ const [promo, setPromo] = useState({
 
   // Export
   const downloadReport = () => { /* Code export CSV simplifié */ alert("Téléchargement..."); };
+
+// Sauvegarder la Lettre Ouverte
+  const handleSaveLetter = async (e) => {
+    e.preventDefault();
+    try {
+        await setDoc(doc(db, "content", "open_letter"), letter); // On écrase ou on crée
+        alert("📜 Lettre ouverte publiée/mise à jour !");
+    } catch (error) {
+        console.error(error);
+        alert("Erreur sauvegarde lettre");
+    }
+  };
 
   // === RENDU ===
   if (view === 'login') {
@@ -555,6 +585,58 @@ const [promo, setPromo] = useState({
                         <button disabled={isUploading} className="md:col-span-2 bg-gradient-to-r from-orange-600 to-orange-500 text-white font-bold py-3 rounded-lg hover:from-orange-700 hover:to-orange-600 flex justify-center items-center gap-2 mt-4 shadow-md">
                              {isUploading ? "Envoi en cours..." : "Sauvegarder la Promotion"}
                              {!isUploading && <Upload size={18}/>}
+                        </button>
+                    </form>
+                </div>
+
+                {/* --- NOUVEAU BLOC : LETTRE OUVERTE / ÉDITO --- */}
+                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-gray-800 lg:col-span-2">
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800">
+                            📜 Lettre Ouverte / Mot du DG
+                        </h3>
+                        {/* Switch ON/OFF */}
+                        <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-lg border">
+                             <span className="text-sm font-bold text-gray-700">Publier :</span>
+                             <button 
+                                type="button"
+                                onClick={() => setLetter({...letter, active: !letter.active})}
+                                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${letter.active ? 'bg-green-500' : 'bg-gray-300'}`}
+                             >
+                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${letter.active ? 'translate-x-6' : ''}`} />
+                             </button>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSaveLetter} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Titre / Objet :</label>
+                                <input className="w-full border p-2 rounded" value={letter.title} onChange={e => setLetter({...letter, title: e.target.value})} placeholder="Ex: Message à nos partenaires" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Date d'affichage :</label>
+                                <input className="w-full border p-2 rounded" value={letter.date} onChange={e => setLetter({...letter, date: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Corps de la lettre :</label>
+                            <textarea 
+                                className="w-full border p-4 rounded h-40 font-serif text-gray-700 leading-relaxed bg-gray-50" 
+                                placeholder="Chers partenaires, chers clients..." 
+                                value={letter.content} 
+                                onChange={e => setLetter({...letter, content: e.target.value})} 
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Signature :</label>
+                            <input className="w-full border p-2 rounded font-bold text-gray-700" value={letter.signature} onChange={e => setLetter({...letter, signature: e.target.value})} placeholder="La Direction KréTan" />
+                        </div>
+
+                        <button className="w-full bg-gray-800 text-white font-bold py-3 rounded hover:bg-black transition flex justify-center gap-2">
+                            Enregistrer et Publier <Save size={18}/>
                         </button>
                     </form>
                 </div>

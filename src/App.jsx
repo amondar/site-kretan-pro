@@ -135,6 +135,7 @@ const App = () => {
   const [secretClicks, setSecretClicks] = useState(0);
 
   const [livePromo, setLivePromo] = useState(null);
+  const [liveLetter, setLiveLetter] = useState(null);
 
   // Langue
   const [lang, setLang] = useState('fr'); 
@@ -172,8 +173,18 @@ const App = () => {
             setLivePromo(docSnap.data()); // On met à jour la variable
           }
         });
+      
 
-        return () => unsubscribe(); // Nettoyage quand on quitte
+        // 6. Charger la Lettre Ouverte en direct (Live)
+        const unsubLetter = onSnapshot(doc(db, "content", "open_letter"), (docSnap) => {
+          if (docSnap.exists()) setLiveLetter(docSnap.data());
+        });
+        
+        // 👇 LA CORRECTION EST ICI : ON NETTOIE LES DEUX EN MÊME TEMPS
+    return () => {
+        unsubscribe();   // On arrête d'écouter la promo
+        unsubLetter();  // On arrête d'écouter la lettre
+    };
 
       } catch (err) { console.error("Erreur chargement contenu", err); }
     };
@@ -343,6 +354,44 @@ const App = () => {
           </div>
         </div>
       </section>
+
+      {/* --- SECTION LETTRE OUVERTE / ÉDITO --- */}
+      {liveLetter?.active && (
+        <section className="py-16 bg-white relative">
+            {/* Petit fond décoratif */}
+            <div className="absolute top-0 left-0 w-full h-1/2 bg-gray-50 z-0"></div>
+            
+            <div className="max-w-4xl mx-auto px-4 relative z-10">
+                <div className="bg-white p-8 md:p-12 rounded-none shadow-2xl border-t-4 border-orange-500 relative">
+                    {/* Icône guillemet décorative */}
+                    <div className="absolute -top-6 -left-4 bg-orange-500 text-white p-3 rounded-full shadow-lg">
+                        <MessageCircle size={32} fill="currentColor" />
+                    </div>
+
+                    <div className="text-center mb-8">
+                        <p className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">{liveLetter.date}</p>
+                        <h2 className="text-3xl font-serif font-bold text-gray-900">{liveLetter.title}</h2>
+                        <div className="w-16 h-1 bg-teal-500 mx-auto mt-4"></div>
+                    </div>
+
+                    <div className="prose prose-lg mx-auto text-gray-600 font-serif leading-relaxed text-justify whitespace-pre-line">
+                        {liveLetter.content}
+                    </div>
+
+                    <div className="mt-10 flex justify-end items-center gap-4">
+                        <div className="text-right">
+                            <p className="font-bold text-gray-900 text-lg">{liveLetter.signature}</p>
+                            <p className="text-orange-500 text-xs uppercase font-bold tracking-wider">KréTan Pro+</p>
+                        </div>
+                        {/* Emplacement pour une signature image si besoin plus tard */}
+                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                             <PenTool size={20} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+      )}
 
       {/* --- SECTION A: PARTENAIRES (Confiance) --- */}
       <section className="bg-gray-100 border-b border-gray-200 py-8">
