@@ -16,6 +16,14 @@ import { collection, addDoc, getDocs, getDoc, doc, onSnapshot } from "firebase/f
 import { translations } from './translations';
 import CookieConsent from './CookieConsent';
 
+// Fonction pour extraire l'ID YouTube (fonctionne avec les liens longs et courts)
+const getYouTubeId = (url) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+};
+
 // --- COMPOSANT ASSISTANT CHAT INTELLIGENT ---
 const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -543,19 +551,46 @@ const App = () => {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">{t.nav_projects}</h2>
             <div className="w-20 h-1 bg-orange-500 mx-auto rounded-full"></div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {projectsList.length === 0 && <div className="col-span-3 text-center text-gray-500 italic">Aucune réalisation affichée pour le moment.</div>}
-            {projectsList.map((proj, index) => (
-                <div key={index} className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer bg-white h-72">
-                  <img src={proj.imageUrl} alt={proj.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-500"/>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-6">
-                    <div>
-                      <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded mb-2 inline-block">{proj.type}</span>
-                      <h3 className="text-white font-bold text-xl">{proj.title}</h3>
+            
+            {projectsList.map((proj, index) => {
+                const videoId = getYouTubeId(proj.videoUrl); // On vérifie si c'est une vidéo
+
+                return (
+                    <div key={index} className="group relative overflow-hidden rounded-2xl shadow-lg cursor-pointer bg-white h-72">
+                        
+                        {/* CAS 1 : C'EST UNE VIDÉO YOUTUBE */}
+                        {videoId ? (
+                            <div className="w-full h-full relative">
+                                <iframe 
+                                    className="absolute inset-0 w-full h-full"
+                                    src={`https://www.youtube.com/embed/${videoId}?rel=0`} 
+                                    title={proj.title}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowFullScreen
+                                ></iframe>
+                                {/* Petit badge vidéo */}
+                                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shadow">
+                                    <Youtube size={12}/> Vidéo
+                                </div>
+                            </div>
+                        ) : (
+                        
+                        /* CAS 2 : C'EST UNE IMAGE (Comportement habituel) */
+                            <>
+                                <img src={proj.imageUrl || "https://via.placeholder.com/400"} alt={proj.title} className="w-full h-full object-cover transform group-hover:scale-110 transition duration-500"/>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-6 pointer-events-none">
+                                    <div>
+                                        <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded mb-2 inline-block">{proj.type}</span>
+                                        <h3 className="text-white font-bold text-xl">{proj.title}</h3>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
-                  </div>
-                </div>
-            ))}
+                );
+            })}
           </div>
         </div>
       </section>

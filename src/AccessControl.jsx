@@ -43,7 +43,8 @@ const AccessControl = () => {
   // --- FORMULAIRES ---
   const [newEmp, setNewEmp] = useState({ name: '', role: 'Ouvrier', code: '' });
   const [newRule, setNewRule] = useState({ keywords: '', response: '' });
-  const [newProject, setNewProject] = useState({ title: '', type: 'Construction', imageUrl: '' });
+  // On ajoute videoUrl : ''
+  const [newProject, setNewProject] = useState({ title: '', type: 'Construction', imageUrl: '', videoUrl: '' });
 
   const [promoImageFile, setPromoImageFile] = useState(null); // Promo
  // On déclare TOUS les champs (Titre, Réduction, Description...)
@@ -275,28 +276,27 @@ const [promo, setPromo] = useState({
   const handleAddRule = async (e) => { e.preventDefault(); await addDoc(collection(db, "chatbot_knowledge"), { keywords: newRule.keywords.toLowerCase(), response: newRule.response, createdAt: serverTimestamp() }); setNewRule({keywords:'', response:''}); };
   
   // Ajouter un projet (Avec Upload Cloudinary)
+  // Ajouter un projet (Mise à jour Vidéo)
   const handleAddProject = async (e) => {
     e.preventDefault();
     
-    // On décide quelle image utiliser
-    let finalImageUrl = newProject.imageUrl; // Par défaut, le lien texte
+    let finalImageUrl = newProject.imageUrl;
 
-    // Si un fichier local est choisi, on l'upload d'abord
-    if (projectImageFile) {
-        const url = await uploadImage(projectImageFile); // On réutilise votre fonction magique !
+    // Si pas de vidéo mais une image locale, on upload l'image
+    if (!newProject.videoUrl && projectImageFile) {
+        const url = await uploadImage(projectImageFile);
         if (url) finalImageUrl = url;
     }
 
-    // On sauvegarde dans la base de données
     await addDoc(collection(db, "projects"), { 
         ...newProject, 
-        imageUrl: finalImageUrl, // On utilise le bon lien
+        imageUrl: finalImageUrl, 
         createdAt: serverTimestamp() 
     });
 
-    // Remise à zéro du formulaire
-    setNewProject({ title: '', type: 'Gros Œuvre', imageUrl: '' });
-    setProjectImageFile(null); // On vide le fichier sélectionné
+    // Reset avec le champ videoUrl vide
+    setNewProject({ title: '', type: 'Gros Œuvre', imageUrl: '', videoUrl: '' });
+    setProjectImageFile(null);
   };
   
   // Mises à jour Site
@@ -645,7 +645,7 @@ const [promo, setPromo] = useState({
                 <div className="bg-white p-6 rounded-xl shadow border-t-4 border-teal-500">
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Layout className="text-teal-500"/> Portfolio</h3>
                     
-                    <form onSubmit={handleAddProject} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-teal-50 p-4 rounded-lg">
+<form onSubmit={handleAddProject} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-teal-50 p-4 rounded-lg">
                         <input className="border p-2 rounded" placeholder="Titre du projet (ex: Villa Assinie)" value={newProject.title} onChange={e => setNewProject({...newProject, title: e.target.value})} />
                         
                         <select className="border p-2 rounded" value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})}>
@@ -655,10 +655,24 @@ const [promo, setPromo] = useState({
                             <option>Route / VRD</option>
                         </select>
 
-                        {/* 👇 LE BLOC DOUBLE CHOIX (FICHIER ou LIEN) */}
-                        <div className="md:col-span-2 flex gap-2 items-center">
+                        {/* --- NOUVEAU : CHAMP YOUTUBE --- */}
+                        <div className="md:col-span-2">
+                             <label className="block text-xs font-bold text-red-600 mb-1 flex items-center gap-1">
+                                <Youtube size={14}/> Option Vidéo (Youtube) :
+                             </label>
+                             <input 
+                                className="border p-2 rounded w-full border-red-200 bg-red-50 text-sm" 
+                                placeholder="Collez le lien YouTube ici (ex: https://youtu.be/...)" 
+                                value={newProject.videoUrl || ''} 
+                                onChange={e => setNewProject({...newProject, videoUrl: e.target.value})} 
+                             />
+                             <p className="text-[10px] text-gray-500 mt-1 italic">Si vous mettez une vidéo, elle remplacera la photo sur le site.</p>
+                        </div>
+
+                        {/* LE BLOC PHOTO (Classique) - On le garde pour ceux qui n'ont pas de vidéo */}
+                        <div className="md:col-span-2 flex gap-2 items-center border-t border-gray-200 pt-2">
                             <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Photo depuis l'ordi :</label>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Ou Photo depuis l'ordi :</label>
                                 <input 
                                     type="file" 
                                     accept="image/*"
@@ -666,20 +680,10 @@ const [promo, setPromo] = useState({
                                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200"
                                 />
                             </div>
-                            <span className="text-gray-400 font-bold">OU</span>
-                            <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Lien internet :</label>
-                                <input 
-                                    className="border p-2 rounded w-full" 
-                                    placeholder="https://..." 
-                                    value={newProject.imageUrl} 
-                                    onChange={e => setNewProject({...newProject, imageUrl: e.target.value})} 
-                                />
-                            </div>
                         </div>
 
                         <button disabled={isUploading} className="md:col-span-2 bg-teal-600 text-white font-bold py-2 rounded hover:bg-teal-700 flex justify-center items-center gap-2">
-                            {isUploading ? "Envoi de la photo..." : "Ajouter ce projet"}
+                            {isUploading ? "Envoi..." : "Ajouter ce projet"}
                             {!isUploading && <Upload size={18}/>}
                         </button>
                     </form>
