@@ -254,7 +254,8 @@ const App = () => {
     // Remplacer par vos IDs EmailJS
     const serviceID = 'service_kmqb7pe'; 
     const templateID = 'template_xj6th9r';
-    const publicKey = 't2lZdCL1RcS4vwDqB'; 
+    //const publicKey = 't2lZdCL1RcS4vwDqB'; 
+    const publicKey = '-VLSqltlrglaRlI4F';
 
     emailjs.sendForm(serviceID, templateID, form.current, publicKey)
       .then(() => {
