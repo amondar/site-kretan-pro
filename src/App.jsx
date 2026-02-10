@@ -676,19 +676,35 @@ const App = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
             
-            {/* Colonne 1 : La Marque */}
+           {/* Colonne 1 : Identité & Coordonnées */}
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl font-bold text-teal-400">KréTan</span>
-                <span className="text-2xl font-bold text-orange-500">Pro+</span>
-              </div>
-              <p className="text-gray-400 leading-relaxed mb-4">Votre partenaire de confiance.</p>
-              <div className="text-gray-400 text-sm space-y-1">
-                <p>📍 Siège Social : N'douci / Tiassalé</p>
-                <p>🛣️ Autoroute du Nord (45 min d'Abidjan)</p>
+              <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-orange-500 mb-4">
+                KréTan Pro+
+              </h3>
+              <p className="text-gray-400 mb-6">Votre partenaire de confiance.</p>
+              
+              <div className="space-y-3"> {/* J'ai ajouté space-y-3 pour aérer les lignes */}
+                  
+                  <div className="flex items-center gap-2 text-gray-400 text-sm">
+                    <MapPin size={16} className="text-pink-500" />
+                    <span>Siège Social : N'douci / Tiassalé</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-400 text-sm">
+                     {/* Vous avez peut-être une icône Route ou Map ici */}
+                    <span>🛣️ Autoroute du Nord (45 min d'Abidjan)</span>
+                  </div>
+
+                  {/* --- NOUVEAU : L'ADRESSE EMAIL --- */}
+                  <div className="flex items-center gap-2 text-gray-400 text-sm group">
+                    <Mail size={16} className="text-orange-500 group-hover:scale-110 transition" />
+                    <a href="mailto:contact@kretanpro.ci" className="hover:text-white transition decoration-orange-500 underline-offset-4 hover:underline">
+                        contact@kretanpro.ci
+                    </a>
+                  </div>
+
               </div>
             </div>
-
             {/* Colonne 2 : Liens Rapides */}
             <div>
               <h3 className="text-lg font-bold text-white mb-4">Liens Rapides</h3>
