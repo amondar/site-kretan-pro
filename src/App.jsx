@@ -25,17 +25,30 @@ const getVideoConfig = (url) => {
     const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const ytMatch = url.match(ytRegExp);
     if (ytMatch && ytMatch[2].length === 11) {
-        return { type: 'youtube', src: `https://www.youtube.com/embed/${ytMatch[2]}?rel=0` };
+        const videoId = ytMatch[2];
+        // Paramètres expliqués :
+        // rel=0 : Suggère uniquement VOS vidéos à la fin (pas celles des autres).
+        // modestbranding=1 : Réduit le logo YouTube.
+        // showinfo=0 : Masque le titre en haut (plus propre).
+        // loop=1&playlist=${videoId} : (Optionnel) Fait tourner la vidéo en boucle pour ne JAMAIS montrer de suggestions.
+        
+        return { 
+            type: 'youtube', 
+            src: `https://www.youtube.com/embed/${videoId}?loop=1&playlist=${videoId}&modestbranding=1` 
+        };
     }
 
     // 2. Détection Facebook
     if (url.includes('facebook.com') || url.includes('fb.watch')) {
-        // Facebook a besoin que le lien soit "encodé" pour fonctionner dans l'iframe
         const encodedUrl = encodeURIComponent(url);
-        return { type: 'facebook', src: `https://www.facebook.com/plugins/video.php?href=${encodedUrl}&show_text=0&width=560` };
+        // Facebook n'a pas de paramètre "rel=0", mais on peut minimiser l'interface
+        return { 
+            type: 'facebook', 
+            src: `https://www.facebook.com/plugins/video.php?href=${encodedUrl}&show_text=0&width=560&autoplay=0` 
+        };
     }
 
-    return { type: null }; // Ce n'est pas une vidéo reconnue
+    return { type: null };
 };
 
 // --- COMPOSANT ASSISTANT CHAT INTELLIGENT ---
