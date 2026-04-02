@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth } from "firebase/auth"; // 👈 AJOUTER CECI
 
 // Your web app's Firebase configuration
 
@@ -26,3 +27,4 @@ const storage = getStorage(app);
 
 
 export { db, storage };
+export const auth = getAuth(app); //
