@@ -28,3 +28,7 @@ const storage = getStorage(app);
 
 export { db, storage };
 export const auth = getAuth(app); //
+
+// 🟢 NOUVEAU : Application Secondaire (Celle qui crée les employés en silence)
+const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+export const secondaryAuth = getAuth(secondaryApp);

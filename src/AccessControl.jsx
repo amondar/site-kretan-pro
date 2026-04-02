@@ -8,11 +8,12 @@ import {
 import { 
   collection, addDoc, query, orderBy, onSnapshot, deleteDoc, 
   doc, updateDoc, serverTimestamp, 
-  getDoc, setDoc 
+  getDoc, getDocs, setDoc, where  // <--- getDocs EST AJOUTÉ ICI
 } from 'firebase/firestore';
 
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { db, auth } from './firebase'; 
+// AJOUT DE createUserWithEmailAndPassword et secondaryAuth
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
+import { db, auth, secondaryAuth } from './firebase';
 
 
 const AccessControl = () => {
@@ -30,6 +31,10 @@ const AccessControl = () => {
   const [projects, setProjects] = useState([]);
   const [publicTeam, setPublicTeam] = useState([]);
   const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '' });
+
+  const [currentUserRole, setCurrentUserRole] = useState(null); // <-- NOUVEAU
+  // On ajoute "email" dans newEmp
+  const [newEmp, setNewEmp] = useState({ name: '', role: 'Ouvrier', code: '', email: '' });
   
   const [imageFile, setImageFile] = useState(null); 
   const [projectImageFile, setProjectImageFile] = useState(null); 
@@ -37,7 +42,7 @@ const AccessControl = () => {
 
   const [socialLinks, setSocialLinks] = useState({ facebook: '', youtube: '', linkedin: '', instagram: '' });
 
-  const [newEmp, setNewEmp] = useState({ name: '', role: 'Ouvrier', code: '' });
+  //const [newEmp, setNewEmp] = useState({ name: '', role: 'Ouvrier', code: '' });
   const [newRule, setNewRule] = useState({ keywords: '', response: '' });
   const [newProject, setNewProject] = useState({ title: '', type: 'Construction', imageUrl: '', videoUrl: '' });
 
@@ -66,13 +71,29 @@ const AccessControl = () => {
         setFeedback({ type: 'error', msg: "Firebase Auth non détecté. Mettez à jour firebase.js." });
         setIsLoadingAuth(false);
         return;
+        
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+   const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsAuthenticated(true);
+        // 🔍 CHERCHER LE RÔLE DE L'UTILISATEUR
+        try {
+            const q = query(collection(db, "users"), where("email", "==", user.email.toLowerCase()));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                setCurrentUserRole(querySnapshot.docs[0].data().role);
+            } else {
+                // Si pas trouvé dans la liste (ex: l'Admin principal d'origine)
+                setCurrentUserRole('SuperAdmin'); 
+            }
+        } catch(e) {
+            console.error("Erreur lecture rôle", e);
+            setCurrentUserRole('Ouvrier'); // Sécurité
+        }
       } else {
         setIsAuthenticated(false);
+        setCurrentUserRole(null);
       }
       setIsLoadingAuth(false);
     });
@@ -177,18 +198,53 @@ const AccessControl = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!auth) return showFeedback('error', "Impossible. Firebase Auth n'est pas configuré.");
+
+    // Formatage de la date et l'heure pour le journal
+    const now = new Date();
+    const displayDate = now.toLocaleString('fr-FR');
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // 1. On connecte l'utilisateur
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userEmail = userCredential.user.email.toLowerCase();
+
+      // 2. On cherche son vrai Nom dans la base de données pour l'afficher joliment
+      let userName = "Admin / " + userEmail; // Nom par défaut s'il n'est pas dans la liste
+      try {
+          const q = query(collection(db, "users"), where("email", "==", userEmail));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+              userName = querySnapshot.docs[0].data().name; // On récupère "Kouassi Jean"
+          }
+      } catch(err) { console.error("Erreur lecture nom", err); }
+
+      // 3. ON ÉCRIT LE LOG DE SUCCÈS DANS FIREBASE
+      await addDoc(collection(db, "logs"), {
+          name: userName,
+          status: 'Succès',
+          displayDate: displayDate,
+          timestamp: serverTimestamp()
+      });
+
       showFeedback('success', 'Connexion réussie.');
       setEmail('');
       setPassword('');
       setView('dashboard');
+
     } catch (error) {
       console.error(error);
+      
+      // 4. ON ÉCRIT LE LOG D'ÉCHEC EN CAS DE MAUVAIS MOT DE PASSE
+      await addDoc(collection(db, "logs"), {
+          name: email || "Inconnu",
+          status: 'Échec',
+          displayDate: displayDate,
+          timestamp: serverTimestamp()
+      });
+
       showFeedback('error', 'Identifiants incorrects ou accès refusé.');
     }
   };
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -221,7 +277,32 @@ const AccessControl = () => {
     setImageFile(null); 
   };
 
-  const handleAddEmployee = async (e) => { e.preventDefault(); await addDoc(collection(db, "users"), { ...newEmp, code: newEmp.code.toUpperCase() }); setNewEmp({name:'', role:'Ouvrier', code:''}); };
+  const handleAddEmployee = async (e) => { 
+      e.preventDefault(); 
+      if(newEmp.code.length < 6) return alert("Le code doit faire au moins 6 caractères (Requis par Firebase).");
+      
+      setIsUploading(true); // On utilise cet état pour afficher un chargement
+      try {
+          // 1. Création silencieuse dans Auth (Ne déconnecte pas l'admin)
+          await createUserWithEmailAndPassword(secondaryAuth, newEmp.email, newEmp.code.toUpperCase());
+
+          // 2. Sauvegarde du profil dans Firestore
+          await addDoc(collection(db, "users"), { 
+              name: newEmp.name, 
+              role: newEmp.role, 
+              code: newEmp.code.toUpperCase(),
+              email: newEmp.email.toLowerCase()
+          }); 
+
+          showFeedback('success', "Employé ajouté et compte créé avec succès !");
+          setNewEmp({name:'', role:'Ouvrier', code:'', email:''}); 
+      } catch(error) {
+          console.error(error);
+          alert("Erreur : Cet email est peut-être déjà utilisé.");
+      }
+      setIsUploading(false);
+  }; 
+  
   const handleAddRule = async (e) => { e.preventDefault(); await addDoc(collection(db, "chatbot_knowledge"), { keywords: newRule.keywords.toLowerCase(), response: newRule.response, createdAt: serverTimestamp() }); setNewRule({keywords:'', response:''}); };
   
   const handleAddProject = async (e) => {
@@ -324,10 +405,16 @@ const AccessControl = () => {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
-          <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-full font-bold ${view === 'dashboard' ? 'bg-orange-500 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>📊 Logs</button>
+          <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-full font-bold ${view === 'dashboard' ? 'bg-orange-500 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>📊 Tableau de bord</button>
+          
+          {/* RESTRICTION : Seuls les Admins voient ces boutons */}
+{currentUserRole && (currentUserRole.toLowerCase() === 'superadmin' || currentUserRole.toLowerCase() === 'admin' || currentUserRole.toLowerCase() === 'directeur') && (
+      <>
           <button onClick={() => setView('users')} className={`px-4 py-2 rounded-full font-bold ${view === 'users' ? 'bg-blue-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>👥 Équipe</button>
-          <button onClick={() => setView('ai')} className={`px-4 py-2 rounded-full font-bold ${view === 'ai' ? 'bg-purple-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>🧠 IA</button>
-          <button onClick={() => setView('website')} className={`px-4 py-2 rounded-full font-bold ${view === 'website' ? 'bg-teal-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>🖥️ Site Web</button>
+                  <button onClick={() => setView('ai')} className={`px-4 py-2 rounded-full font-bold ${view === 'ai' ? 'bg-purple-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>🧠 IA</button>
+                  <button onClick={() => setView('website')} className={`px-4 py-2 rounded-full font-bold ${view === 'website' ? 'bg-teal-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>🖥️ Site Web</button>
+              </>
+          )}
         </div>
 
         {view === 'dashboard' && <div className="bg-white p-6 rounded shadow"><h3 className="font-bold mb-4">Journal des accès</h3><div className="max-h-96 overflow-auto">{accessLogs.map(l=><div key={l.id} className="border-b p-2 flex justify-between"><span>{l.displayDate} - {l.name}</span><span className={l.status==='Succès'?'text-green-600':'text-red-600'}>{l.status}</span></div>)}</div></div>}
@@ -337,20 +424,22 @@ const AccessControl = () => {
             <div className="bg-white p-6 rounded-xl shadow h-fit border-t-4 border-blue-500">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-800"><PlusCircle size={20}/> Nouvel Employé</h3>
               <form onSubmit={handleAddEmployee} className="space-y-4">
-                <div><label className="text-xs font-bold text-gray-500">Nom Complet</label><input className="w-full border p-2 rounded" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} placeholder="Ex: Kouassi Jean" /></div>
+                <div><label className="text-xs font-bold text-gray-500">Nom Complet</label><input required className="w-full border p-2 rounded" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} placeholder="Ex: Kouassi Jean" /></div>
+                
+                {/* NOUVEAU CHAMP EMAIL */}
+                <div><label className="text-xs font-bold text-gray-500">Email de connexion</label><input type="email" required className="w-full border p-2 rounded" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} placeholder="Ex: jean@kretanpro.ci" /></div>
+
                 <div>
                   <label className="text-xs font-bold text-gray-500">Rôle / Poste</label>
                   <select className="w-full border p-2 rounded bg-white" value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value})}>
                     <option value="Ouvrier">Ouvrier</option>
                     <option value="Chef de Chantier">Chef de Chantier</option>
-                    <option value="Admin">Admin (Accès CMS)</option>
+                    <option value="Admin">Admin (Accès CMS Complet)</option>
                     <option value="Directeur">Directeur</option>
-                    <option value="Stagiaire">Stagiaire</option>
-                    <option value="Secrétaire">Secrétaire</option>
                   </select>
                 </div>
-                <div><label className="text-xs font-bold text-gray-500">Code de pointage interne</label><input className="w-full border p-2 rounded uppercase font-mono text-center tracking-widest" value={newEmp.code} onChange={e => setNewEmp({...newEmp, code: e.target.value})} placeholder="Ex: A123" maxLength={6}/></div>
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition shadow-md">Enregistrer</button>
+                <div><label className="text-xs font-bold text-gray-500">Code (Mot de passe) - Min 6 caractères</label><input required className="w-full border p-2 rounded uppercase font-mono text-center tracking-widest" value={newEmp.code} onChange={e => setNewEmp({...newEmp, code: e.target.value})} placeholder="Ex: A12345" minLength={6} maxLength={10}/></div>
+                <button type="submit" disabled={isUploading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition shadow-md">{isUploading ? 'Création...' : 'Enregistrer'}</button>
               </form>
             </div>
             <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow border-t-4 border-gray-200">
