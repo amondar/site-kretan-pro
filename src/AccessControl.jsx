@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Menu, X , Lock, LogIn, Users, Trash2, PlusCircle, 
   Brain, Layout, Megaphone, Save, Facebook, Youtube, 
-  Linkedin, Instagram, Download, Upload
+  Linkedin, Instagram, Download, Upload,Edit
 } from 'lucide-react';
 
 import { 
@@ -31,6 +31,8 @@ const AccessControl = () => {
   const [projects, setProjects] = useState([]);
   const [publicTeam, setPublicTeam] = useState([]);
   const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '' });
+
+  const [editingTeamMemberId, setEditingTeamMemberId] = useState(null); // <--- NOUVELLE LIGNE
 
   const [currentUserRole, setCurrentUserRole] = useState(null); // <-- NOUVEAU
   // On ajoute "email" dans newEmp
@@ -267,14 +269,47 @@ const AccessControl = () => {
         if (url) finalImageUrl = url;
     }
 
-    await addDoc(collection(db, "public_team"), { 
-        ...newTeamMember, 
-        imageUrl: finalImageUrl, 
-        createdAt: serverTimestamp() 
-    });
+    if (editingTeamMemberId) {
+        // MODE MODIFICATION : On met à jour le document existant
+        await updateDoc(doc(db, "public_team", editingTeamMemberId), {
+            ...newTeamMember,
+            imageUrl: finalImageUrl,
+            updatedAt: serverTimestamp()
+        });
+        showFeedback('success', "Membre mis à jour avec succès !");
+    } else {
+        // MODE CRÉATION : On ajoute un nouveau document
+        await addDoc(collection(db, "public_team"), { 
+            ...newTeamMember, 
+            imageUrl: finalImageUrl, 
+            createdAt: serverTimestamp() 
+        });
+        showFeedback('success', "Nouveau membre ajouté !");
+    }
 
+    // On remet le formulaire à zéro
     setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' });
+    setEditingTeamMemberId(null);
     setImageFile(null); 
+  };
+
+  // NOUVELLE FONCTION : Quand on clique sur le bouton Modifier
+  const handleEditTeamMember = (member) => {
+      setNewTeamMember({
+          name: member.name || '',
+          role: member.role || '',
+          quote: member.quote || '',
+          imageUrl: member.imageUrl || ''
+      });
+      setEditingTeamMemberId(member.id);
+      setImageFile(null);
+  };
+
+  // NOUVELLE FONCTION : Pour annuler une modification en cours
+  const cancelEditTeamMember = () => {
+      setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' });
+      setEditingTeamMemberId(null);
+      setImageFile(null);
   };
 
   const handleAddEmployee = async (e) => { 
@@ -589,20 +624,39 @@ const AccessControl = () => {
                             </div>
                         </div>
                         <textarea className="border p-2 rounded md:col-span-2" placeholder="Citation..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
-                        <button disabled={isUploading} className="md:col-span-2 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700 flex justify-center items-center gap-2">
-                            {isUploading ? "Envoi en cours..." : "Ajouter ce membre"}
-                            {!isUploading && <Upload size={18}/>}
-                        </button>
+                        {/* --- LES BOUTONS DU FORMULAIRE ÉQUIPE --- */}
+                        <div className="md:col-span-2 flex gap-2">
+                            <button disabled={isUploading} type="submit" className="flex-1 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700 flex justify-center items-center gap-2 transition">
+                                {isUploading ? "Envoi en cours..." : (editingTeamMemberId ? "Mettre à jour ce membre" : "Ajouter ce membre")}
+                                {!isUploading && (editingTeamMemberId ? <Save size={18}/> : <Upload size={18}/>)}
+                            </button>
+                            
+                            {/* Bouton Annuler qui n'apparaît qu'en mode modification */}
+                            {editingTeamMemberId && (
+                                <button type="button" onClick={cancelEditTeamMember} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 transition">
+                                    Annuler
+                                </button>
+                            )}
+                        </div>
                     </form>
+
+                    {/* --- LA LISTE DES MEMBRES --- */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {publicTeam.map(member => (
-                            <div key={member.id} className="flex items-center gap-3 border p-2 rounded bg-white shadow-sm">
+                            <div key={member.id} className={`flex items-center gap-3 border p-2 rounded shadow-sm transition ${editingTeamMemberId === member.id ? 'bg-purple-100 border-purple-400' : 'bg-white'}`}>
                                 <img src={member.imageUrl || 'https://via.placeholder.com/50'} className="w-10 h-10 rounded-full object-cover" alt="avatar" />
                                 <div className="flex-1">
                                     <p className="font-bold text-sm">{member.name}</p>
                                     <p className="text-xs text-gray-500">{member.role}</p>
                                 </div>
-                                <button onClick={() => handleDelete('public_team', member.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                {/* NOUVEAU : Bouton Éditer (Crayon) */}
+                                <button onClick={() => handleEditTeamMember(member)} className="text-blue-500 hover:bg-blue-100 p-2 rounded transition" title="Modifier">
+                                    <Edit size={16}/>
+                                </button>
+                                {/* Ancien Bouton Supprimer */}
+                                <button onClick={() => handleDelete('public_team', member.id)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Supprimer">
+                                    <Trash2 size={16}/>
+                                </button>
                             </div>
                         ))}
                         {publicTeam.length === 0 && <p className="text-gray-400 italic text-sm">Aucun membre affiché sur le site.</p>}
