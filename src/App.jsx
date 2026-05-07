@@ -3,13 +3,13 @@ import emailjs from '@emailjs/browser';
 import { 
   Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, 
   MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram, Lock, 
-  MapPin, Phone, Mail, Star, Award, Clock, Shield, Briefcase, User 
+  MapPin, Phone, Mail, Star, Award, Clock, Shield, Briefcase, User , Download
 } from 'lucide-react';
 import AccessControl from './AccessControl';
 import ReactGA from "react-ga4";
 
 import { db } from './firebase'; 
-import { collection, addDoc, getDocs, getDoc, doc, onSnapshot } from "firebase/firestore";
+import { collection, addDoc, getDocs, getDoc, doc, onSnapshot,query, where} from "firebase/firestore";
 
 import { translations } from './translations';
 import CookieConsent from './CookieConsent';
@@ -157,7 +157,8 @@ const App = () => {
   const [lang, setLang] = useState('fr'); 
   const t = translations[lang] || translations['fr'];
 
-  const [selectedImage, setSelectedImage] = useState(null);
+ const [selectedImage, setSelectedImage] = useState(null);
+ const [selectedTeamMember, setSelectedTeamMember] = useState(null); // <--- NOUVEAU POUR LE PROFIL
 
   const handleSecretClick = () => {
     setSecretClicks(prev => prev + 1);
@@ -188,8 +189,14 @@ const App = () => {
           if (docSnap.exists()) setLivePromo(docSnap.data());
         });
 
-        unsubLetter = onSnapshot(doc(db, "content", "open_letter"), (docSnap) => {
-          if (docSnap.exists()) setLiveLetter(docSnap.data());
+        // On écoute UNIQUEMENT la lettre qui est cochée "active" dans l'historique
+        const qLetter = query(collection(db, "open_letters"), where("active", "==", true));
+        unsubLetter = onSnapshot(qLetter, (snap) => {
+            if (!snap.empty) {
+                setLiveLetter(snap.docs[0].data()); // Prend la première lettre active trouvée
+            } else {
+                setLiveLetter(null); // S'il n'y en a aucune, on cache la section
+            }
         });
 
       } catch (err) { 
@@ -355,36 +362,52 @@ const App = () => {
         </div>
       </section>
 
-      {/* --- SECTION LETTRE OUVERTE / ÉDITO --- */}
-      {liveLetter?.active && (
-        <section className="py-16 bg-white relative">
+      {/* --- SECTION LETTRE OUVERTE / ÉDITO MULTIMÉDIA --- */}
+      {liveLetter && (
+        <section className="py-16 bg-white relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1/2 bg-gray-50 z-0"></div>
-            <div className="max-w-4xl mx-auto px-4 relative z-10">
-                <div className="bg-white p-8 md:p-12 rounded-none shadow-2xl border-t-4 border-orange-500 relative">
-                    <div className="absolute -top-6 -left-4 bg-orange-500 text-white p-3 rounded-full shadow-lg">
-                        <MessageCircle size={32} fill="currentColor" />
-                    </div>
-
-                    <div className="text-center mb-8">
-                        <p className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">{liveLetter.date}</p>
-                        <h2 className="text-3xl font-serif font-bold text-gray-900">{liveLetter.title}</h2>
-                        <div className="w-16 h-1 bg-teal-500 mx-auto mt-4"></div>
-                    </div>
-
-                    <div className="prose prose-lg mx-auto text-gray-600 font-serif leading-relaxed text-justify whitespace-pre-line">
-                        {liveLetter.content}
-                    </div>
-
-                    <div className="mt-10 flex justify-end items-center gap-4">
-                        <div className="text-right">
-                            <p className="font-bold text-gray-700 text-sm uppercase tracking-wide">Directeur Général</p>
-                            <p className="font-black text-gray-900 text-xl mb-1">{liveLetter.signature}</p>
-                            <p className="text-orange-500 text-xs uppercase font-bold tracking-wider">KréTan Pro+</p>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                
+                <div className="bg-white rounded-2xl shadow-2xl border-t-4 border-orange-500 relative flex flex-col lg:flex-row">
+                    
+                    {/* Colonne Image (S'affiche uniquement s'il y a une image d'illustration) */}
+                    {liveLetter.imageUrl && (
+                        <div className="lg:w-2/5 relative h-64 lg:h-auto">
+                            <img src={liveLetter.imageUrl} alt="Édito" className="absolute inset-0 w-full h-full object-cover object-[80%_center]" />
+                            {/* On retire le dégradé blanc sur ordinateur pour avoir une image nette */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent lg:hidden"></div>
                         </div>
-                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
-                             <PenTool size={20} />
+                    )}
+
+                    {/* Colonne Texte */}
+                    <div className={`p-8 md:p-12 relative flex-1 ${!liveLetter.imageUrl ? 'max-w-4xl mx-auto w-full' : ''}`}>
+                        {/* Icône guillemet décorative (masquée sur mobile si image pour gagner de la place) */}
+                        <div className={`absolute -top-6 -left-4 bg-orange-500 text-white p-3 rounded-full shadow-lg hidden md:block`}>
+                            <MessageCircle size={32} fill="currentColor" />
+                        </div>
+
+                        <div className="text-left mb-8">
+                            <p className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">{liveLetter.date}</p>
+                            <h2 className="text-3xl md:text-4xl font-serif font-bold text-gray-900">{liveLetter.title}</h2>
+                            <div className="w-16 h-1 bg-teal-500 mt-4"></div>
+                        </div>
+
+                        <div className="prose prose-lg text-gray-600 font-serif leading-relaxed text-justify whitespace-pre-line">
+                            {liveLetter.content}
+                        </div>
+
+                        <div className="mt-10 flex justify-end items-center gap-4 border-t border-gray-100 pt-6">
+                            <div className="text-right">
+                                <p className="font-bold text-gray-700 text-sm uppercase tracking-wide">Directeur Général</p>
+                                <p className="font-black text-gray-900 text-xl mb-1">{liveLetter.signature}</p>
+                                <p className="text-orange-500 text-xs uppercase font-bold tracking-wider">KréTan Pro+</p>
+                            </div>
+                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 shadow-inner">
+                                 <PenTool size={20} />
+                            </div>
                         </div>
                     </div>
+                    
                 </div>
             </div>
         </section>
@@ -595,13 +618,18 @@ const App = () => {
                 </div>
             )}
             {teamList.map((member, index) => (
-                <div key={index} className="text-center group">
-                  <div className="relative w-40 h-40 mx-auto mb-4 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg group-hover:border-orange-500 transition duration-300">
+                <div key={index} className="text-center group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition duration-300">
+                  <div className="relative w-40 h-40 mx-auto mb-4 rounded-full overflow-hidden border-4 border-gray-50 shadow-inner group-hover:border-orange-500 transition duration-300 cursor-pointer" onClick={() => setSelectedTeamMember(member)}>
                     <img src={member.imageUrl || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"} alt={member.name} className="w-full h-full object-cover object-top" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900">{member.name}</h3>
                   <p className="text-orange-600 font-medium text-sm uppercase tracking-wide mb-2">{member.role}</p>
-                  <p className="text-gray-500 text-sm px-4 italic">"{member.quote}"</p>
+                  <p className="text-gray-500 text-sm italic mb-4 line-clamp-2">"{member.quote}"</p>
+                  
+                  {/* NOUVEAU BOUTON */}
+                  <button onClick={() => setSelectedTeamMember(member)} className="text-teal-600 font-bold text-sm flex items-center justify-center gap-1 mx-auto hover:text-teal-800 transition">
+                      Voir le profil complet <ArrowRight size={16}/>
+                  </button>
                 </div>
             ))}
           </div>
@@ -732,8 +760,59 @@ const App = () => {
         </div>
       )}
 
+      {/* --- MODAL PROFIL ÉQUIPE (Pop-up) --- */}
+      {selectedTeamMember && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
+            {/* Fond noir cliquable pour fermer */}
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={() => setSelectedTeamMember(null)}></div>
+            
+            {/* Boîte principale */}
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative z-10 flex flex-col md:flex-row animate-fade-in-up">
+                
+                {/* Bouton fermer */}
+                <button onClick={() => setSelectedTeamMember(null)} className="absolute top-4 right-4 text-gray-400 hover:text-orange-500 transition z-20 bg-white rounded-full p-1 shadow-md">
+                    <X size={24} />
+                </button>
+                
+                {/* Colonne Gauche : Photo & Bouton CV */}
+                <div className="md:w-2/5 bg-gray-50 p-8 flex flex-col items-center justify-center border-r border-gray-100">
+                    <img src={selectedTeamMember.imageUrl || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png"} alt={selectedTeamMember.name} className="w-48 h-48 md:w-56 md:h-56 rounded-full object-cover object-top shadow-lg mb-6 border-4 border-white" />
+                    <h3 className="text-2xl font-black text-gray-900 text-center">{selectedTeamMember.name}</h3>
+                    <p className="text-orange-600 font-bold text-sm uppercase tracking-wider text-center mt-2">{selectedTeamMember.role}</p>
+                    
+                    {selectedTeamMember.cvUrl && (
+                        <a href={selectedTeamMember.cvUrl} target="_blank" rel="noopener noreferrer" className="mt-8 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-full flex items-center justify-center gap-2 transition w-full shadow-md">
+                            <Download size={18}/> Télécharger le CV
+                        </a>
+                    )}
+                </div>
+                
+                {/* Colonne Droite : Textes */}
+                <div className="md:w-3/5 p-8 md:p-10">
+                    <h4 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2 border-b pb-3">
+                        <User size={24} className="text-teal-600"/> Biographie & Parcours
+                    </h4>
+                    
+                    <div className="prose prose-sm md:prose-base text-gray-600 text-justify whitespace-pre-line leading-relaxed">
+                        {selectedTeamMember.bio || "Le parcours détaillé de ce collaborateur sera bientôt disponible."}
+                    </div>
+                    
+                    {selectedTeamMember.quote && (
+                        <blockquote className="mt-8 border-l-4 border-orange-500 pl-5 italic text-gray-500 text-sm bg-orange-50 p-4 rounded-r-lg">
+                            "{selectedTeamMember.quote}"
+                        </blockquote>
+                    )}
+                </div>
+                
+            </div>
+        </div>
+      )}
+
     </div>
   );
+
+  
+
 };
 
 export default App;

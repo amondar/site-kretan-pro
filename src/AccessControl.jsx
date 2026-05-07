@@ -30,7 +30,10 @@ const AccessControl = () => {
   const [knowledge, setKnowledge] = useState([]);
   const [projects, setProjects] = useState([]);
   const [publicTeam, setPublicTeam] = useState([]);
-  const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '' });
+  
+  const [newTeamMember, setNewTeamMember] = useState({ name: '', role: '', quote: '', imageUrl: '', bio: '', cvUrl: '' });
+  //const [editingTeamMemberId, setEditingTeamMemberId] = useState(null);
+  const [cvFile, setCvFile] = useState(null); // <--- NOUVEAU POUR LE FICHIER PDF
 
   const [editingTeamMemberId, setEditingTeamMemberId] = useState(null); // <--- NOUVELLE LIGNE
 
@@ -58,13 +61,11 @@ const AccessControl = () => {
       bgImage: ''      
   });
 
-  const [letter, setLetter] = useState({ 
-      active: false, 
-      title: 'Lettre aux Partenaires', 
-      content: '', 
-      signature: 'La Direction',
-      date: new Date().toLocaleDateString()
-  });
+// --- NOUVEAUX ÉTATS POUR LA LETTRE OUVERTE MULTIMÉDIA ---
+  const [openLetters, setOpenLetters] = useState([]);
+  const [newLetter, setNewLetter] = useState({ title: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' });
+  const [editingLetterId, setEditingLetterId] = useState(null);
+  const [letterImageFile, setLetterImageFile] = useState(null);
   
   // ✅ CORRECTION : PROTECTION ANTI-CRASH (PAGE BLANCHE)
   useEffect(() => {
@@ -131,13 +132,9 @@ const AccessControl = () => {
     };
     loadPromo();
 
-    const loadLetter = async () => {
-        try {
-            const docSnap = await getDoc(doc(db, "content", "open_letter"));
-            if (docSnap.exists()) setLetter(docSnap.data());
-        } catch (e) { console.log("Pas de lettre encore"); }
-    };
-    loadLetter();
+// Charger l'historique des lettres ouvertes
+    const qLetters = query(collection(db, "open_letters"), orderBy("createdAt", "desc"));
+    const unsubLetters = onSnapshot(qLetters, (snap) => setOpenLetters(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
     const loadSocials = async () => {
         try {
@@ -175,7 +172,7 @@ const AccessControl = () => {
 
     setIsUploading(true);
     try {
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
         method: "POST",
         body: formData
       });
@@ -262,6 +259,8 @@ const AccessControl = () => {
     e.preventDefault();
     if(!newTeamMember.name) return alert("Le nom est obligatoire");
 
+    let finalCvUrl = newTeamMember.cvUrl; // <--- NOUVEAU
+
     let finalImageUrl = newTeamMember.imageUrl; 
 
     if (imageFile) {
@@ -269,11 +268,18 @@ const AccessControl = () => {
         if (url) finalImageUrl = url;
     }
 
+// NOUVEAU : ENVOI DU CV PDF
+    if (cvFile) {
+        const url = await uploadImage(cvFile);
+        if (url) finalCvUrl = url;
+    }
+
     if (editingTeamMemberId) {
         // MODE MODIFICATION : On met à jour le document existant
         await updateDoc(doc(db, "public_team", editingTeamMemberId), {
             ...newTeamMember,
             imageUrl: finalImageUrl,
+            cvUrl: finalCvUrl, // <--- NOUVEAU
             updatedAt: serverTimestamp()
         });
         showFeedback('success', "Membre mis à jour avec succès !");
@@ -282,15 +288,17 @@ const AccessControl = () => {
         await addDoc(collection(db, "public_team"), { 
             ...newTeamMember, 
             imageUrl: finalImageUrl, 
+            cvUrl: finalCvUrl, // <--- NOUVEAU
             createdAt: serverTimestamp() 
         });
         showFeedback('success', "Nouveau membre ajouté !");
     }
 
     // On remet le formulaire à zéro
-    setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' });
+    setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' ,bio: '', cvUrl: '' });
     setEditingTeamMemberId(null);
     setImageFile(null); 
+    setCvFile(null);
   };
 
   // NOUVELLE FONCTION : Quand on clique sur le bouton Modifier
@@ -299,7 +307,8 @@ const AccessControl = () => {
           name: member.name || '',
           role: member.role || '',
           quote: member.quote || '',
-          imageUrl: member.imageUrl || ''
+          imageUrl: member.imageUrl || '',
+          bio: member.bio || '', cvUrl: member.cvUrl || ''
       });
       setEditingTeamMemberId(member.id);
       setImageFile(null);
@@ -307,9 +316,10 @@ const AccessControl = () => {
 
   // NOUVELLE FONCTION : Pour annuler une modification en cours
   const cancelEditTeamMember = () => {
-      setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '' });
+      setNewTeamMember({ name: '', role: '', quote: '', imageUrl: '',bio: '', cvUrl: '' });
       setEditingTeamMemberId(null);
       setImageFile(null);
+      setCvFile(null);
   };
 
   const handleAddEmployee = async (e) => { 
@@ -384,15 +394,61 @@ const AccessControl = () => {
   
   const handleUpdateSocials = async (e) => { e.preventDefault(); await setDoc(doc(db, "content", "social_links"), socialLinks); alert("Réseaux sociaux mis à jour !"); };
 
-  const handleSaveLetter = async (e) => {
+  // --- NOUVELLES FONCTIONS LETTRE OUVERTE ---
+  const handleSaveOpenLetter = async (e) => {
     e.preventDefault();
-    try {
-        await setDoc(doc(db, "content", "open_letter"), letter); 
-        alert("📜 Lettre ouverte publiée/mise à jour !");
-    } catch (error) {
-        console.error(error);
-        alert("Erreur sauvegarde lettre");
+    if(!newLetter.title || !newLetter.content) return alert("Le titre et le contenu sont obligatoires.");
+
+    setIsUploading(true);
+    let finalImageUrl = newLetter.imageUrl; 
+    if (letterImageFile) {
+        const url = await uploadImage(letterImageFile);
+        if (url) finalImageUrl = url;
     }
+
+    if (editingLetterId) {
+        // Mode Mise à jour
+        await updateDoc(doc(db, "open_letters", editingLetterId), {
+            ...newLetter, imageUrl: finalImageUrl, updatedAt: serverTimestamp()
+        });
+        showFeedback('success', "Lettre mise à jour avec succès !");
+    } else {
+        // Mode Création
+        await addDoc(collection(db, "open_letters"), { 
+            ...newLetter, imageUrl: finalImageUrl, active: false, createdAt: serverTimestamp() 
+        });
+        showFeedback('success', "Nouvelle lettre sauvegardée dans l'historique !");
+    }
+
+    setNewLetter({ title: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' });
+    setEditingLetterId(null);
+    setLetterImageFile(null); 
+    setIsUploading(false);
+  };
+
+  const handleEditLetter = (lettre) => {
+      setNewLetter({
+          title: lettre.title || '', content: lettre.content || '', signature: lettre.signature || '', 
+          date: lettre.date || '', imageUrl: lettre.imageUrl || ''
+      });
+      setEditingLetterId(lettre.id);
+      setLetterImageFile(null);
+  };
+
+  const handleActivateLetter = async (letterId, isCurrentlyActive) => {
+      // 1. Si elle est déjà active, on la désactive simplement
+      if (isCurrentlyActive) {
+          await updateDoc(doc(db, "open_letters", letterId), { active: false });
+          return;
+      }
+      // 2. Sinon, on désactive d'abord toutes les autres lettres
+      const activeLetters = openLetters.filter(l => l.active);
+      for (const l of activeLetters) {
+          await updateDoc(doc(db, "open_letters", l.id), { active: false });
+      }
+      // 3. Et on active la nouvelle
+      await updateDoc(doc(db, "open_letters", letterId), { active: true });
+      showFeedback('success', "La lettre est maintenant en ligne sur le site !");
   };
 
   if (isLoadingAuth) {
@@ -549,25 +605,69 @@ const AccessControl = () => {
                     </form>
                 </div>
 
+                {/* --- LETTRE OUVERTE / ÉDITO MULTIMÉDIA --- */}
                 <div className="bg-white p-6 rounded-xl shadow border-t-4 border-gray-800 lg:col-span-2">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4">
-                        <h3 className="font-bold text-lg flex items-center gap-2 text-gray-800">📜 Lettre Ouverte / Mot du DG</h3>
-                        <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-lg border">
-                             <span className="text-sm font-bold text-gray-700">Publier :</span>
-                             <button type="button" onClick={() => setLetter({...letter, active: !letter.active})} className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${letter.active ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${letter.active ? 'translate-x-6' : ''}`} />
-                             </button>
-                        </div>
-                    </div>
-                    <form onSubmit={handleSaveLetter} className="space-y-4">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-800">📜 Lettres Ouvertes (Historique & Multimédia)</h3>
+                    
+                    <form onSubmit={handleSaveOpenLetter} className="space-y-4 mb-8 bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">Titre / Objet :</label><input className="w-full border p-2 rounded" value={letter.title} onChange={e => setLetter({...letter, title: e.target.value})} placeholder="Ex: Message à nos partenaires" /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">Date d'affichage :</label><input className="w-full border p-2 rounded" value={letter.date} onChange={e => setLetter({...letter, date: e.target.value})} /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 mb-1">Titre / Objet :</label><input required className="w-full border p-2 rounded" value={newLetter.title} onChange={e => setNewLetter({...newLetter, title: e.target.value})} placeholder="Ex: Message à nos partenaires" /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 mb-1">Date d'affichage :</label><input required className="w-full border p-2 rounded" value={newLetter.date} onChange={e => setNewLetter({...newLetter, date: e.target.value})} /></div>
                         </div>
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Corps de la lettre :</label><textarea className="w-full border p-4 rounded h-40 font-serif text-gray-700 leading-relaxed bg-gray-50" placeholder="Chers partenaires..." value={letter.content} onChange={e => setLetter({...letter, content: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Signature :</label><input className="w-full border p-2 rounded font-bold text-gray-700" value={letter.signature} onChange={e => setLetter({...letter, signature: e.target.value})} placeholder="La Direction KréTan" /></div>
-                        <button className="w-full bg-gray-800 text-white font-bold py-3 rounded hover:bg-black transition flex justify-center gap-2">Enregistrer et Publier <Save size={18}/></button>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Image d'illustration (Fichier) :</label>
+                                <input type="file" accept="image/*" onChange={(e) => setLetterImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">OU Lien de l'image (URL) :</label>
+                                <input className="w-full border p-2 rounded" value={newLetter.imageUrl} onChange={e => setNewLetter({...newLetter, imageUrl: e.target.value})} placeholder="https://..." />
+                            </div>
+                        </div>
+
+                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Corps de la lettre :</label><textarea required className="w-full border p-4 rounded h-40 font-serif text-gray-700 leading-relaxed bg-white" placeholder="Chers partenaires..." value={newLetter.content} onChange={e => setNewLetter({...newLetter, content: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Signature :</label><input required className="w-full border p-2 rounded font-bold text-gray-700" value={newLetter.signature} onChange={e => setNewLetter({...newLetter, signature: e.target.value})} placeholder="La Direction KréTan" /></div>
+                        
+                        <div className="flex gap-2">
+                            <button type="submit" disabled={isUploading} className="flex-1 bg-gray-800 text-white font-bold py-2 rounded hover:bg-black transition flex justify-center gap-2">
+                                {isUploading ? "Sauvegarde..." : (editingLetterId ? "Mettre à jour la lettre" : "Sauvegarder la lettre")} 
+                                {!isUploading && (editingLetterId ? <Edit size={18}/> : <Save size={18}/>)}
+                            </button>
+                            {editingLetterId && (
+                                <button type="button" onClick={() => {setEditingLetterId(null); setNewLetter({ title: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' })}} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 transition">Annuler</button>
+                            )}
+                        </div>
                     </form>
+
+                    {/* Historique des lettres */}
+                    <h4 className="font-bold text-sm text-gray-500 mb-3 uppercase tracking-wider">Historique & Publication</h4>
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                        {openLetters.map(lettre => (
+                            <div key={lettre.id} className={`flex items-center gap-4 border p-3 rounded-lg shadow-sm transition ${lettre.active ? 'border-green-500 bg-green-50' : 'bg-white'}`}>
+                                {lettre.imageUrl ? (
+                                    <img src={lettre.imageUrl} className="w-16 h-16 rounded object-cover" alt="mini" />
+                                ) : (
+                                    <div className="w-16 h-16 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Layout size={20}/></div>
+                                )}
+                                
+                                <div className="flex-1">
+                                    <p className="font-bold text-gray-800 text-sm">{lettre.title}</p>
+                                    <p className="text-xs text-gray-500">{lettre.date} • {lettre.signature}</p>
+                                    {lettre.active && <span className="inline-block mt-1 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">En ligne</span>}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => handleActivateLetter(lettre.id, lettre.active)} className={`text-xs font-bold px-3 py-1.5 rounded transition ${lettre.active ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                                        {lettre.active ? 'Retirer' : 'Publier'}
+                                    </button>
+                                    <button onClick={() => handleEditLetter(lettre)} className="text-blue-500 hover:bg-blue-100 p-2 rounded transition" title="Modifier"><Edit size={16}/></button>
+                                    <button onClick={() => handleDelete('open_letters', lettre.id)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Supprimer"><Trash2 size={16}/></button>
+                                </div>
+                            </div>
+                        ))}
+                        {openLetters.length === 0 && <p className="text-gray-400 italic text-sm text-center py-4">Aucune lettre sauvegardée.</p>}
+                    </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl shadow border-t-4 border-teal-500">
@@ -610,32 +710,48 @@ const AccessControl = () => {
                 <div className="bg-white p-6 rounded-xl shadow border-t-4 border-purple-600 lg:col-span-2">
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-purple-800">👔 L'Équipe (Visible sur le site)</h3>
                     <form onSubmit={handleAddPublicTeam} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-purple-50 p-4 rounded-lg">
-                        <input className="border p-2 rounded" placeholder="Nom" value={newTeamMember.name} onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})} />
-                        <input className="border p-2 rounded" placeholder="Poste" value={newTeamMember.role} onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})} />
-                        <div className="md:col-span-2 flex gap-2 items-center">
+                        <input required className="border p-2 rounded" placeholder="Nom Complet" value={newTeamMember.name} onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})} />
+                        <input required className="border p-2 rounded" placeholder="Poste (ex: Directeur Technique)" value={newTeamMember.role} onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})} />
+                        
+                        {/* SECTION IMAGE */}
+                        <div className="md:col-span-2 flex gap-2 items-center bg-white p-3 rounded shadow-sm border border-gray-100">
                             <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Choisir une photo locale :</label>
-                                <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" />
+                                <label className="block text-xs font-bold text-gray-500 mb-1">📸 Photo du membre :</label>
+                                <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" />
                             </div>
-                            <span className="text-gray-400 font-bold">OU</span>
+                            <span className="text-gray-300 font-bold text-xs">OU URL:</span>
                             <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Lien direct (URL) :</label>
-                                <input className="border p-2 rounded w-full" placeholder="https://..." value={newTeamMember.imageUrl} onChange={e => setNewTeamMember({...newTeamMember, imageUrl: e.target.value})} />
+                                <input className="border p-1.5 text-sm rounded w-full" placeholder="https://..." value={newTeamMember.imageUrl} onChange={e => setNewTeamMember({...newTeamMember, imageUrl: e.target.value})} />
                             </div>
                         </div>
-                        <textarea className="border p-2 rounded md:col-span-2" placeholder="Citation..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
-                        {/* --- LES BOUTONS DU FORMULAIRE ÉQUIPE --- */}
-                        <div className="md:col-span-2 flex gap-2">
-                            <button disabled={isUploading} type="submit" className="flex-1 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700 flex justify-center items-center gap-2 transition">
+
+                        {/* SECTION CV PDF */}
+                        <div className="md:col-span-2 flex gap-2 items-center bg-white p-3 rounded shadow-sm border border-gray-100">
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-gray-500 mb-1">📄 Fichier CV (PDF) :</label>
+                                <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setCvFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200" />
+                            </div>
+                            <span className="text-gray-300 font-bold text-xs">OU URL:</span>
+                            <div className="flex-1">
+                                <input className="border p-1.5 text-sm rounded w-full" placeholder="Lien vers le CV..." value={newTeamMember.cvUrl} onChange={e => setNewTeamMember({...newTeamMember, cvUrl: e.target.value})} />
+                            </div>
+                        </div>
+
+                        {/* TEXTES (Citation & Bio) */}
+                        <input className="border p-2 rounded md:col-span-2" placeholder="Petite citation / Slogan (Visible sur l'accueil)..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
+                        
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Biographie Complète & Parcours :</label>
+                            <textarea className="border p-2 rounded w-full h-32 text-sm text-gray-700" placeholder="Décrivez le parcours, les diplômes, l'expérience..." value={newTeamMember.bio} onChange={e => setNewTeamMember({...newTeamMember, bio: e.target.value})} />
+                        </div>
+
+                        <div className="md:col-span-2 flex gap-2 mt-2">
+                            <button disabled={isUploading} type="submit" className="flex-1 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700 flex justify-center items-center gap-2 transition shadow-md">
                                 {isUploading ? "Envoi en cours..." : (editingTeamMemberId ? "Mettre à jour ce membre" : "Ajouter ce membre")}
                                 {!isUploading && (editingTeamMemberId ? <Save size={18}/> : <Upload size={18}/>)}
                             </button>
-                            
-                            {/* Bouton Annuler qui n'apparaît qu'en mode modification */}
                             {editingTeamMemberId && (
-                                <button type="button" onClick={cancelEditTeamMember} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 transition">
-                                    Annuler
-                                </button>
+                                <button type="button" onClick={cancelEditTeamMember} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 transition">Annuler</button>
                             )}
                         </div>
                     </form>
