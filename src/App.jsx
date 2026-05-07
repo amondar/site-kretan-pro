@@ -372,8 +372,8 @@ const App = () => {
                     
                     {/* Colonne Image (S'affiche uniquement s'il y a une image d'illustration) */}
                     {liveLetter.imageUrl && (
-                        <div className="lg:w-2/5 relative h-64 lg:h-auto">
-                            <img src={liveLetter.imageUrl} alt="Édito" className="absolute inset-0 w-full h-full object-cover object-[80%_center]" />
+                        <div className="lg:w-2/5 relative h-80 lg:h-auto overflow-hidden rounded-t-2xl lg:rounded-l-2xl lg:rounded-tr-none">
+                          <img src={liveLetter.imageUrl} alt="Édito" className="absolute inset-0 w-full h-full object-cover object-[80%_top] lg:object-[80%_center]" />
                             {/* On retire le dégradé blanc sur ordinateur pour avoir une image nette */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent lg:hidden"></div>
                         </div>
