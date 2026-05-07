@@ -365,7 +365,8 @@ const App = () => {
         </div>
       </section>
 
-      {/* ========================================================= */}
+      
+{/* ========================================================= */}
       {/* 1. LETTRE PERMANENTE FIXE (Appel au Partenariat)          */}
       {/* ========================================================= */}
       <section className="py-20 bg-orange-50 relative overflow-hidden">
@@ -421,26 +422,32 @@ const App = () => {
       {/* ========================================================= */}
       {/* 2. LETTRE DYNAMIQUE DU CMS (Actualités / Édito ponctuel)  */}
       {/* ========================================================= */}
+      {/* --- SECTION LETTRE OUVERTE / ÉDITO MULTIMÉDIA --- */}
       {liveLetter && (
-        <section className="py-16 bg-white relative overflow-hidden border-t border-gray-100">
+        <section className="py-16 bg-white relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1/2 bg-gray-50 z-0"></div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                {/* Petit titre pour différencier de la lettre principale */}
-                <h3 className="text-center text-sm font-bold text-gray-400 uppercase tracking-widest mb-8">Dernière communication</h3>
                 
-                <div className="bg-gray-50 rounded-2xl shadow-lg border-t-4 border-teal-500 relative flex flex-col lg:flex-row">
+                <div className="bg-white rounded-2xl shadow-2xl border-t-4 border-orange-500 relative flex flex-col lg:flex-row">
                     
-                    {/* Colonne Image */}
+                    {/* Colonne Image (S'affiche uniquement s'il y a une image d'illustration) */}
                     {liveLetter.imageUrl && (
                         <div className="lg:w-2/5 relative h-80 lg:h-auto overflow-hidden rounded-t-2xl lg:rounded-l-2xl lg:rounded-tr-none">
-                            <img src={liveLetter.imageUrl} alt="Édito" className="absolute inset-0 w-full h-full object-cover object-[80%_top] lg:object-[80%_center]" />
+                          <img src={liveLetter.imageUrl} alt="Édito" className="absolute inset-0 w-full h-full object-cover object-[80%_top] lg:object-[80%_center]" />
+                            {/* On retire le dégradé blanc sur ordinateur pour avoir une image nette */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent lg:hidden"></div>
                         </div>
                     )}
 
                     {/* Colonne Texte */}
                     <div className={`p-8 md:p-12 relative flex-1 ${!liveLetter.imageUrl ? 'max-w-4xl mx-auto w-full' : ''}`}>
+                        {/* Icône guillemet décorative (masquée sur mobile si image pour gagner de la place) */}
+                        <div className={`absolute -top-6 -left-4 bg-orange-500 text-white p-3 rounded-full shadow-lg hidden md:block`}>
+                            <MessageCircle size={32} fill="currentColor" />
+                        </div>
+
                         <div className="text-left mb-8">
-                            <p className="text-teal-600 text-sm uppercase tracking-widest font-bold mb-2">{liveLetter.date}</p>
+                            <p className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">{liveLetter.date}</p>
                             <h2 className="text-3xl md:text-4xl font-serif font-bold text-gray-900">{liveLetter.title}</h2>
                             <div className="w-16 h-1 bg-teal-500 mt-4"></div>
                         </div>
@@ -449,12 +456,18 @@ const App = () => {
                             {liveLetter.content}
                         </div>
 
-                        <div className="mt-10 flex justify-end items-center gap-4 border-t border-gray-200 pt-6">
+                        <div className="mt-10 flex justify-end items-center gap-4 border-t border-gray-100 pt-6">
                             <div className="text-right">
+                                <p className="font-bold text-gray-700 text-sm uppercase tracking-wide">Directeur Général</p>
                                 <p className="font-black text-gray-900 text-xl mb-1">{liveLetter.signature}</p>
+                                <p className="text-orange-500 text-xs uppercase font-bold tracking-wider">KréTan Pro+</p>
+                            </div>
+                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 shadow-inner">
+                                 <PenTool size={20} />
                             </div>
                         </div>
                     </div>
+                    
                 </div>
             </div>
         </section>
