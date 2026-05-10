@@ -9,14 +9,12 @@ import { getAuth } from "firebase/auth"; // 👈 AJOUTER CECI
 // Your web app's Firebase configuration
 
 const firebaseConfig = {
-
-  apiKey: "AIzaSyCVlUvESci3DdAWu04laKfVR88atfJrOms",
-  authDomain: "kretan-app-88637.firebaseapp.com",
-  projectId: "kretan-app-88637",
-  storageBucket: "kretan-app-88637.firebasestorage.app",
-  messagingSenderId: "121610372263",
-  appId: "1:121610372263:web:ce87b264ca282d01d9c782"
-
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 

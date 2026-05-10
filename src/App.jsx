@@ -109,7 +109,8 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-600">
-      <Promo livePromo={livePromo} type="topbar" />
+      {/* 1. LE PETIT BANDEAU TOUT EN HAUT */}
+      <Promo type="bar" />
       <Navbar openModal={openModal} lang={lang} setLang={setLang} t={t} />
       {/* --- SECTION HERO (Accueil) --- */}
       <Hero openModal={openModal} />
@@ -118,7 +119,8 @@ const App = () => {
       {/* --- SECTION PARTENAIRES --- */}
       <Partners partnersList={partnersList} />
       {/* --- SECTION PROMO DYNAMIQUE --- */}
-      <Promo livePromo={livePromo} openModal={openModal} />
+      {/* 3. LA GRANDE BANNIÈRE IMAGE (Sous le menu) */}
+      <Promo type="banner" />
       {/* --- SECTION QUI SOMMES NOUS --- */}
       <About />
       {/* --- SECTION SERVICES --- */}

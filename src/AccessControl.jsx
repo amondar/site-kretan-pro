@@ -12,7 +12,15 @@ import {
 } from 'firebase/firestore';
 
 // AJOUT DE createUserWithEmailAndPassword et secondaryAuth
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
+import { 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged, 
+    createUserWithEmailAndPassword,
+    setPersistence,             // <-- À AJOUTER
+    browserLocalPersistence     // <-- À AJOUTER
+} from 'firebase/auth';
+
 import { db, auth, secondaryAuth } from './firebase';
 
 import AdminProjects from "./admin/AdminProjects";
@@ -32,7 +40,16 @@ const AccessControl = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const [view, setView] = useState('dashboard');
+  // 1. On lit la mémoire du navigateur, sinon on va sur 'dashboard' par défaut
+  const [view, setView] = useState(() => {
+      return localStorage.getItem('kretan_cms_view') || 'dashboard';
+  });
+
+  // 2. À chaque fois qu'on change d'onglet, on le sauvegarde dans la mémoire
+  useEffect(() => {
+      localStorage.setItem('kretan_cms_view', view);
+  }, [view]);
+
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
   
   const [accessLogs, setAccessLogs] = useState([]);
@@ -60,16 +77,12 @@ const AccessControl = () => {
   //const [newEmp, setNewEmp] = useState({ name: '', role: 'Ouvrier', code: '' });
   const [newRule, setNewRule] = useState({ keywords: '', response: '' });
   const [newProject, setNewProject] = useState({ title: '', type: 'Construction', imageUrl: '', videoUrl: '' });
+  const [editingProjectId, setEditingProjectId] = useState(null);
 
-  const [promoImageFile, setPromoImageFile] = useState(null); 
-  const [promo, setPromo] = useState({ 
-      active: false, 
-      text: '',        
-      title: '',       
-      discount: '',    
-      description: '', 
-      bgImage: ''      
-  });
+  const [promosList, setPromosList] = useState([]);
+  const [newPromo, setNewPromo] = useState({ text: '', title: '', discount: '', description: '', bgImage: '' });
+  const [editingPromoId, setEditingPromoId] = useState(null);
+  const [promoImageFile, setPromoImageFile] = useState(null);
 
 // --- NOUVEAUX ÉTATS POUR LA LETTRE OUVERTE MULTIMÉDIA ---
   const [openLetters, setOpenLetters] = useState([]);
@@ -87,6 +100,12 @@ const AccessControl = () => {
   const [partnersList, setPartnersList] = useState([]);
   const [newPartner, setNewPartner] = useState({ name: '', logoUrl: '' });
   const [partnerLogoFile, setPartnerLogoFile] = useState(null);
+
+  const [editingPartnerId, setEditingPartnerId] = useState(null);
+
+  const [editingEmpId, setEditingEmpId] = useState(null);
+  const [editingRuleId, setEditingRuleId] = useState(null);
+  
   
   // ✅ CORRECTION : PROTECTION ANTI-CRASH (PAGE BLANCHE)
   useEffect(() => {
@@ -143,15 +162,10 @@ const AccessControl = () => {
     const qProjects = query(collection(db, "projects"), orderBy("createdAt", "desc"));
     const unsubProjects = onSnapshot(qProjects, (snap) => setProjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
-    const loadPromo = async () => {
-        try {
-            const docSnap = await getDoc(doc(db, "content", "promo"));
-            if (docSnap.exists()) {
-                setPromo(docSnap.data());
-            }
-        } catch (e) { console.log("Création de la promo par défaut..."); }
-    };
-    loadPromo();
+    // Charger l'historique des Promos
+    const qPromos = query(collection(db, "promos"), orderBy("createdAt", "desc"));
+    const unsubPromos = onSnapshot(qPromos, (snap) => setPromosList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    // N'oubliez pas d'ajouter unsubPromos(); dans le return à la fin de votre useEffect !
 
 // Charger l'historique des lettres ouvertes
     const qLetters = query(collection(db, "open_letters"), orderBy("createdAt", "desc"));
@@ -186,7 +200,7 @@ const AccessControl = () => {
     loadSocials();
     
 
-    return () => { unsubLogs(); unsubUsers(); unsubBrain(); unsubProjects(); unsubTeam(); unsubPartners(); };
+    return () => { unsubLogs(); unsubUsers(); unsubBrain(); unsubProjects(); unsubTeam(); unsubPartners(); unsubPromos(); unsubLetters(); unsubOngoing(); };
   }, [isAuthenticated]); 
 
   const showFeedback = (type, msg) => {
@@ -196,8 +210,9 @@ const AccessControl = () => {
 
   const uploadImage = async (file) => {
     if (!file) return null;
-    const cloudName = "dsrjqutzc"; 
-    const uploadPreset = "my4mitws"; 
+    // On utilise les variables sécurisées
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME; 
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
     const formData = new FormData();
     formData.append("file", file);
@@ -358,74 +373,202 @@ const AccessControl = () => {
       setCvFile(null);
   };
 
+  // --- GESTION DES EMPLOYÉS ---
   const handleAddEmployee = async (e) => { 
-      e.preventDefault(); 
-      if(newEmp.code.length < 6) return alert("Le code doit faire au moins 6 caractères (Requis par Firebase).");
+      if (e && e.preventDefault) e.preventDefault(); 
+      if(newEmp.code.length < 6) return showFeedback('error', "Le code doit faire au moins 6 caractères.");
       
-      setIsUploading(true); // On utilise cet état pour afficher un chargement
+      setIsUploading(true);
       try {
-          // 1. Création silencieuse dans Auth (Ne déconnecte pas l'admin)
-          await createUserWithEmailAndPassword(secondaryAuth, newEmp.email, newEmp.code.toUpperCase());
-
-          // 2. Sauvegarde du profil dans Firestore
-          await addDoc(collection(db, "users"), { 
-              name: newEmp.name, 
-              role: newEmp.role, 
-              code: newEmp.code.toUpperCase(),
-              email: newEmp.email.toLowerCase()
-          }); 
-
-          showFeedback('success', "Employé ajouté et compte créé avec succès !");
+          if (editingEmpId) {
+              // MODE MODIFICATION : On met à jour le profil Firestore (Note: On ne modifie pas le mot de passe Auth ici pour des raisons de sécurité)
+              await updateDoc(doc(db, "users", editingEmpId), {
+                  name: newEmp.name, 
+                  role: newEmp.role, 
+                  code: newEmp.code.toUpperCase(),
+                  email: newEmp.email.toLowerCase()
+              }); 
+              showFeedback('success', "Employé mis à jour avec succès !");
+          } else {
+              // MODE CRÉATION : On crée dans Auth ET dans Firestore
+              await createUserWithEmailAndPassword(secondaryAuth, newEmp.email, newEmp.code.toUpperCase());
+              await addDoc(collection(db, "users"), { 
+                  name: newEmp.name, 
+                  role: newEmp.role, 
+                  code: newEmp.code.toUpperCase(),
+                  email: newEmp.email.toLowerCase()
+              }); 
+              showFeedback('success', "Employé ajouté et compte créé avec succès !");
+          }
           setNewEmp({name:'', role:'Ouvrier', code:'', email:''}); 
+          setEditingEmpId(null);
       } catch(error) {
           console.error(error);
-          alert("Erreur : Cet email est peut-être déjà utilisé.");
+          showFeedback('error', "Erreur : Cet email est peut-être déjà utilisé ou une erreur est survenue.");
+      } finally {
+          setIsUploading(false);
       }
-      setIsUploading(false);
   }; 
-  
-  const handleAddRule = async (e) => { e.preventDefault(); await addDoc(collection(db, "chatbot_knowledge"), { keywords: newRule.keywords.toLowerCase(), response: newRule.response, createdAt: serverTimestamp() }); setNewRule({keywords:'', response:''}); };
-  
+
+  const handleEditEmployee = (emp) => {
+      setNewEmp({ name: emp.name || '', role: emp.role || 'Ouvrier', code: emp.code || '', email: emp.email || '' });
+      setEditingEmpId(emp.id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // --- GESTION DU CERVEAU IA ---
+  const handleAddRule = async (e) => { 
+      if (e && e.preventDefault) e.preventDefault(); 
+      if (!newRule.keywords || !newRule.response) return;
+
+      try {
+          if (editingRuleId) {
+              // MODE MODIFICATION
+              await updateDoc(doc(db, "chatbot_knowledge", editingRuleId), { 
+                  keywords: newRule.keywords.toLowerCase(), 
+                  response: newRule.response 
+              });
+              showFeedback('success', "Règle mise à jour avec succès !");
+          } else {
+              // MODE CRÉATION
+              await addDoc(collection(db, "chatbot_knowledge"), { 
+                  keywords: newRule.keywords.toLowerCase(), 
+                  response: newRule.response, 
+                  createdAt: serverTimestamp() 
+              }); 
+              showFeedback('success', "Nouvelle règle apprise !");
+          }
+          setNewRule({keywords:'', response:''}); 
+          setEditingRuleId(null);
+      } catch (error) {
+          showFeedback('error', "Erreur lors de l'enregistrement de la règle.");
+      }
+  }; 
+
+  const handleEditRule = (rule) => {
+      setNewRule({ keywords: rule.keywords || '', response: rule.response || '' });
+      setEditingRuleId(rule.id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const handleAddProject = async (e) => {
-    e.preventDefault();
-    let finalImageUrl = newProject.imageUrl;
+      if (e && e.preventDefault) e.preventDefault();
+      if (!newProject.title) return showFeedback('error', "Le titre du projet est obligatoire.");
 
-    if (!newProject.videoUrl && projectImageFile) {
-        const url = await uploadImage(projectImageFile);
-        if (url) finalImageUrl = url;
-    }
+      setIsUploading(true);
+      try {
+          // On garde l'ancienne image si on est en mode édition et qu'on ne change pas la photo
+          let finalImageUrl = newProject.imageUrl || '';
 
-    await addDoc(collection(db, "projects"), { 
-        ...newProject, 
-        imageUrl: finalImageUrl, 
-        createdAt: serverTimestamp() 
-    });
+          // Si on upload une nouvelle image (et qu'on n'a pas mis de vidéo à la place)
+          if (!newProject.videoUrl && projectImageFile) {
+              const url = await uploadImage(projectImageFile);
+              if (url) finalImageUrl = url;
+          }
 
-    setNewProject({ title: '', type: 'Gros Œuvre', imageUrl: '', videoUrl: '' });
-    setProjectImageFile(null);
+          if (editingProjectId) {
+              // MODE MODIFICATION
+              await updateDoc(doc(db, "projects", editingProjectId), { 
+                  ...newProject, 
+                  imageUrl: finalImageUrl, 
+                  updatedAt: serverTimestamp() 
+              });
+              showFeedback('success', "Projet mis à jour avec succès !");
+          } else {
+              // MODE CRÉATION
+              await addDoc(collection(db, "projects"), { 
+                  ...newProject, 
+                  imageUrl: finalImageUrl, 
+                  createdAt: serverTimestamp() 
+              });
+              showFeedback('success', "Nouveau projet ajouté au portfolio !");
+          }
+
+          // Nettoyage
+          setNewProject({ title: '', type: 'Construction', imageUrl: '', videoUrl: '' });
+          setProjectImageFile(null);
+          setEditingProjectId(null);
+          
+      } catch (error) {
+          console.error("Erreur:", error);
+          showFeedback('error', "Erreur lors de l'enregistrement du projet.");
+      } finally {
+          setIsUploading(false);
+      }
+  };
+
+  // NOUVELLE FONCTION : Quand on clique sur le crayon d'un projet
+  const handleEditProject = (project) => {
+      setNewProject({
+          title: project.title || '',
+          type: project.type || 'Construction',
+          imageUrl: project.imageUrl || '',
+          videoUrl: project.videoUrl || ''
+      });
+      setEditingProjectId(project.id);
+      setProjectImageFile(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // Remonte la page vers le formulaire
   };
   
-  const handleUpdatePromo = async (e) => {
-    e.preventDefault();
-    let finalImageUrl = promo.bgImage || ""; 
+  // --- NOUVELLES FONCTIONS PROMOTIONS ---
+  const handleSavePromo = async (e) => {
+      e.preventDefault();
+      setIsUploading(true);
+      let finalImageUrl = newPromo.bgImage || ""; 
 
-    if (promoImageFile) {
-        const url = await uploadImage(promoImageFile); 
-        if (url) finalImageUrl = url;
-    }
+      if (promoImageFile) {
+          const url = await uploadImage(promoImageFile); 
+          if (url) finalImageUrl = url;
+      }
 
-    try {
-        await setDoc(doc(db, "content", "promo"), { 
-            ...promo, 
-            bgImage: finalImageUrl 
-        }, { merge: true });
-        
-        alert("✅ Promotion mise à jour avec succès !");
-        setPromoImageFile(null); 
-    } catch (error) {
-        console.error("Erreur:", error);
-        alert("Erreur lors de la sauvegarde.");
-    }
+      try {
+          if (editingPromoId) {
+              await updateDoc(doc(db, "promos", editingPromoId), { 
+                  ...newPromo, bgImage: finalImageUrl, updatedAt: serverTimestamp() 
+              });
+              showFeedback('success', "Promotion mise à jour !");
+          } else {
+              // Par défaut, une nouvelle promo est inactive
+              await addDoc(collection(db, "promos"), { 
+                  ...newPromo, bgImage: finalImageUrl, active: false, createdAt: serverTimestamp() 
+              });
+              showFeedback('success', "Promotion ajoutée aux archives !");
+          }
+          
+          setNewPromo({ text: '', title: '', discount: '', description: '', bgImage: '' });
+          setEditingPromoId(null);
+          setPromoImageFile(null); 
+      } catch (error) {
+          console.error("Erreur:", error);
+          showFeedback('error', "Erreur lors de la sauvegarde.");
+      } finally {
+          setIsUploading(false);
+      }
+  };
+
+  const handleEditPromo = (p) => {
+      setNewPromo({
+          text: p.text || '', title: p.title || '', discount: p.discount || '', 
+          description: p.description || '', bgImage: p.bgImage || ''
+      });
+      setEditingPromoId(p.id);
+      setPromoImageFile(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleActivatePromo = async (promoId, isCurrentlyActive) => {
+      // 1. Si elle est déjà active, on la désactive
+      if (isCurrentlyActive) {
+          await updateDoc(doc(db, "promos", promoId), { active: false });
+          return;
+      }
+      // 2. Sinon, on désactive d'abord TOUTES les autres promos
+      const activePromos = promosList.filter(p => p.active);
+      for (const p of activePromos) {
+          await updateDoc(doc(db, "promos", p.id), { active: false });
+      }
+      // 3. Et on active la nouvelle
+      await updateDoc(doc(db, "promos", promoId), { active: true });
+      showFeedback('success', "La promotion est maintenant en ligne !");
   };
   
   const handleUpdateSocials = async (e) => { e.preventDefault(); await setDoc(doc(db, "content", "social_links"), socialLinks); alert("Réseaux sociaux mis à jour !"); };
@@ -550,50 +693,57 @@ const AccessControl = () => {
   };
 
   const handleAddPartner = async (e) => {
-      // On s'assure que e existe avant d'appeler preventDefault (très utile si on utilise onClick)
       if (e && e.preventDefault) e.preventDefault(); 
-      
-      // Sécurité : on empêche l'envoi si le nom est vide
       if (!newPartner.name || newPartner.name.trim() === '') {
           showFeedback('error', "Veuillez saisir un nom pour le partenaire.");
           return;
       }
 
       setIsUploading(true);
-      
       try {
-          console.log("1. Début de l'ajout du partenaire :", newPartner.name);
-          let finalLogoUrl = '';
+          // On garde l'ancien logo si on est en train de modifier et qu'on n'a pas mis de nouveau fichier
+          let finalLogoUrl = newPartner.logoUrl || ''; 
 
-          // Si un logo est sélectionné, on l'envoie sur Cloudinary
           if (partnerLogoFile) {
-              console.log("2. Envoi du logo en cours...");
               const url = await uploadImage(partnerLogoFile);
-              if (url) {
-                  finalLogoUrl = url;
-                  console.log("3. Logo uploadé avec succès :", url);
-              }
+              if (url) finalLogoUrl = url;
           }
 
-          console.log("4. Sauvegarde dans la base de données Firebase...");
-          await addDoc(collection(db, "partners"), { 
-              name: newPartner.name, 
-              logoUrl: finalLogoUrl 
-          });
+          if (editingPartnerId) {
+              // MODE MODIFICATION
+              await updateDoc(doc(db, "partners", editingPartnerId), { 
+                  name: newPartner.name, 
+                  logoUrl: finalLogoUrl 
+              });
+              showFeedback('success', "Partenaire mis à jour avec succès !");
+          } else {
+              // MODE CRÉATION
+              await addDoc(collection(db, "partners"), { 
+                  name: newPartner.name, 
+                  logoUrl: finalLogoUrl 
+              });
+              showFeedback('success', "Partenaire ajouté avec succès !");
+          }
 
-          console.log("5. Succès total !");
+          // Nettoyage
           setNewPartner({ name: '', logoUrl: '' });
           setPartnerLogoFile(null);
-          showFeedback('success', "Partenaire ajouté avec succès !");
+          setEditingPartnerId(null);
           
       } catch (error) {
-          // S'il y a le moindre problème, ça s'affichera ici au lieu de bloquer !
-          console.error("ERREUR CRITIQUE lors de l'ajout du partenaire :", error);
-          showFeedback('error', "Une erreur est survenue lors de l'ajout.");
+          console.error("Erreur:", error);
+          showFeedback('error', "Une erreur est survenue lors de l'enregistrement.");
       } finally {
-          // Quoi qu'il arrive (succès ou erreur), on arrête le chargement du bouton
           setIsUploading(false);
       }
+  };
+
+  // NOUVELLE FONCTION : Quand on clique sur le crayon
+  const handleEditPartner = (partner) => {
+      setNewPartner({ name: partner.name, logoUrl: partner.logoUrl || '' });
+      setEditingPartnerId(partner.id);
+      setPartnerLogoFile(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (isLoadingAuth) {
@@ -691,15 +841,25 @@ const AccessControl = () => {
 
             {view === 'dashboard' && <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100"><h3 className="font-bold text-xl mb-6 text-gray-800">Journal des accès</h3><div className="max-h-[600px] overflow-auto divide-y">{accessLogs.map(l=><div key={l.id} className="py-3 flex justify-between items-center"><span className="text-gray-600"><span className="font-bold text-gray-900">{l.name}</span> <span className="text-sm ml-2">({l.displayDate})</span></span><span className={`px-3 py-1 rounded-full text-xs font-bold ${l.status==='Succès'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{l.status}</span></div>)}</div></div>}
             
-            {view === 'users' && <AdminUsers newEmp={newEmp} setNewEmp={setNewEmp} handleAddEmployee={handleAddEmployee} isUploading={isUploading} employees={employees} handleDelete={handleDelete} />}
+            {view === 'users' && <AdminUsers newEmp={newEmp} setNewEmp={setNewEmp} handleAddEmployee={handleAddEmployee} isUploading={isUploading} employees={employees} handleDelete={handleDelete} editingEmpId={editingEmpId} setEditingEmpId={setEditingEmpId} handleEditEmployee={handleEditEmployee} />}
             
-            {view === 'ai' && <AdminAi newRule={newRule} setNewRule={setNewRule} handleAddRule={handleAddRule} knowledge={knowledge} handleDelete={handleDelete} />}
-
+            {view === 'ai' && <AdminAi newRule={newRule} setNewRule={setNewRule} handleAddRule={handleAddRule} knowledge={knowledge} handleDelete={handleDelete} editingRuleId={editingRuleId} setEditingRuleId={setEditingRuleId} handleEditRule={handleEditRule} />}
             {view === 'website' && (
               // Ici, on utilise space-y-12 pour bien espacer les blocs au lieu de les tasser
               <div className="space-y-12">
-                  <AdminPromo promo={promo} setPromo={setPromo} handleUpdatePromo={handleUpdatePromo} setPromoImageFile={setPromoImageFile} isUploading={isUploading} />
-                  
+                <AdminPromo 
+                    newPromo={newPromo} 
+                    setNewPromo={setNewPromo} 
+                    handleSavePromo={handleSavePromo} 
+                    setPromoImageFile={setPromoImageFile} 
+                    isUploading={isUploading}
+                    promosList={promosList}
+                    handleEditPromo={handleEditPromo}
+                    handleActivatePromo={handleActivatePromo}
+                    handleDelete={handleDelete}
+                    editingPromoId={editingPromoId}
+                    setEditingPromoId={setEditingPromoId}
+                />                  
                   {/* C'est ici que viendra le composant AdminPartners ! */}
                   
                   <AdminLetters newLetter={newLetter} setNewLetter={setNewLetter} handleSaveOpenLetter={handleSaveOpenLetter} isUploading={isUploading} setLetterImageFile={setLetterImageFile} editingLetterId={editingLetterId} setEditingLetterId={setEditingLetterId} openLetters={openLetters} handleActivateLetter={handleActivateLetter} handleEditLetter={handleEditLetter} handleDelete={handleDelete} />
@@ -711,20 +871,34 @@ const AccessControl = () => {
                     isUploading={isUploading} 
                     partnersList={partnersList} 
                     handleDelete={handleDelete} 
+                    editingPartnerId={editingPartnerId}
+                    setEditingPartnerId={setEditingPartnerId}
+                    handleEditPartner={handleEditPartner}
                   />
 
-                  <AdminProjects newProject={newProject} setNewProject={setNewProject} setProjectImageFile={setProjectImageFile} handleAddProject={handleAddProject} isUploading={isUploading} projects={projects} handleDelete={handleDelete} />
-                  <AdminOngoing 
-                  newOngoing={newOngoing} 
-                  setNewOngoing={setNewOngoing} // <-- Indispensable
-                  handleEditOngoing={handleEditOngoing} // <-- Indispensable
-                  setNewOngoing={setNewOngoing} 
-                  setOngoingImageFile={setOngoingImageFiles} 
-                  setOngoingPdfFile={setOngoingPdfFile} 
-                  handleAddOngoing={handleAddOngoing} 
-                  isUploading={isUploading} 
-                  ongoingProjects={ongoingProjects} 
-                  handleDelete={handleDelete} />
+                  <AdminProjects 
+                    newProject={newProject} 
+                    setNewProject={setNewProject} 
+                    setProjectImageFile={setProjectImageFile} 
+                    handleAddProject={handleAddProject} 
+                    isUploading={isUploading} 
+                    projects={projects} 
+                    handleDelete={handleDelete}
+                    editingProjectId={editingProjectId}          // <-- NOUVEAU
+                    setEditingProjectId={setEditingProjectId}    // <-- NOUVEAU
+                    handleEditProject={handleEditProject}        // <-- NOUVEAU
+                     />                  
+                <AdminOngoing 
+                    newOngoing={newOngoing} 
+                    setNewOngoing={setNewOngoing} 
+                    handleEditOngoing={handleEditOngoing} 
+                    setOngoingImageFile={setOngoingImageFiles} 
+                    setOngoingPdfFile={setOngoingPdfFile} 
+                    handleAddOngoing={handleAddOngoing} 
+                    isUploading={isUploading} 
+                    ongoingProjects={ongoingProjects} 
+                    handleDelete={handleDelete} 
+                />
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <AdminSocials socialLinks={socialLinks} setSocialLinks={setSocialLinks} handleUpdateSocials={handleUpdateSocials} />
                   </div>

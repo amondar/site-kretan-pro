@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, Upload, Trash2 } from 'lucide-react';
+import { Briefcase, Upload, Trash2, Edit } from 'lucide-react';
 
 const AdminPartners = ({ 
     newPartner, 
@@ -8,7 +8,10 @@ const AdminPartners = ({
     handleAddPartner, 
     isUploading, 
     partnersList, 
-    handleDelete 
+    handleDelete,
+    editingPartnerId,
+    setEditingPartnerId,
+    handleEditPartner
 }) => {
   return (
     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
@@ -16,7 +19,7 @@ const AdminPartners = ({
             <Briefcase className="text-gray-500" /> Partenaires & Confiance
         </h3>
         
-        <form onSubmit={handleAddPartner} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 bg-gray-50 p-6 rounded-xl border border-gray-200">
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 bg-gray-50 p-6 rounded-xl border border-gray-200">
             <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Nom de l'entreprise :</label>
                 <input 
@@ -36,24 +39,44 @@ const AdminPartners = ({
                     onChange={(e) => setPartnerLogoFile(e.target.files[0])} 
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 cursor-pointer" 
                 />
+                {editingPartnerId && newPartner.logoUrl && (
+                    <p className="text-[10px] text-orange-600 mt-1 italic">Laissez vide pour conserver l'ancien logo.</p>
+                )}
             </div>
 
-            <button disabled={isUploading} type="submit" className="md:col-span-2 bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black flex justify-center items-center gap-2 transition shadow-md">
-                {isUploading ? "Ajout en cours..." : "Ajouter ce partenaire"}
-                {!isUploading && <Upload size={18}/>}
-            </button>
+            <div className="md:col-span-2 flex gap-2 mt-2">
+                <button 
+                    type="button" 
+                    onClick={handleAddPartner} 
+                    disabled={isUploading || !newPartner.name} 
+                    className="flex-1 bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black flex justify-center items-center gap-2 transition shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                    {isUploading ? "Traitement en cours..." : (editingPartnerId ? "Mettre à jour le partenaire" : "Ajouter ce partenaire")}
+                    {!isUploading && <Upload size={18}/>}
+                </button>
+                {editingPartnerId && (
+                    <button type="button" onClick={() => { setEditingPartnerId(null); setNewPartner({ name: '', logoUrl: '' }); setPartnerLogoFile(null); }} className="bg-gray-400 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-500 transition">
+                        Annuler
+                    </button>
+                )}
+            </div>
         </form>
 
         {/* LISTE DES PARTENAIRES ENREGISTRÉS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {partnersList.map(partner => (
                 <div key={partner.id} className="border border-gray-100 p-4 rounded-xl flex flex-col items-center justify-center gap-3 bg-white shadow-sm hover:shadow-md transition group relative">
-                    <button 
-                        onClick={() => handleDelete('partners', partner.id)} 
-                        className="absolute top-2 right-2 text-red-300 hover:text-red-500 bg-red-50 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition"
-                    >
-                        <Trash2 size={16}/>
-                    </button>
+                    
+                    {/* BOUTONS D'ACTION (Crayon & Poubelle) */}
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button onClick={() => handleEditPartner(partner)} className="text-blue-400 hover:text-blue-600 bg-blue-50 p-1.5 rounded-lg transition" title="Modifier">
+                            <Edit size={16}/>
+                        </button>
+                        <button onClick={() => handleDelete('partners', partner.id)} className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-lg transition" title="Supprimer">
+                            <Trash2 size={16}/>
+                        </button>
+                    </div>
+
                     {partner.logoUrl ? (
                         <img src={partner.logoUrl} className="h-12 object-contain" alt={partner.name} />
                     ) : (
