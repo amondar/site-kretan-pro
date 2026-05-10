@@ -105,6 +105,8 @@ const AccessControl = () => {
 
   const [editingEmpId, setEditingEmpId] = useState(null);
   const [editingRuleId, setEditingRuleId] = useState(null);
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   
   // ✅ CORRECTION : PROTECTION ANTI-CRASH (PAGE BLANCHE)
@@ -824,11 +826,56 @@ const AccessControl = () => {
 
       {/* --- ZONE CENTRALE (AÉRÉE ET SPACIEUSE) --- */}
       <main className="flex-1 h-full overflow-y-auto bg-gray-50 relative">
-        {/* En-tête mobile (si besoin) */}
-        <div className="md:hidden bg-gray-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-10">
-            <span className="font-bold">KréTan Admin</span>
-            <button onClick={handleLogout} className="text-red-400"><X size={24}/></button>
+        {/* --- EN-TÊTE MOBILE --- */}
+        <div className="md:hidden bg-gray-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-30">
+            <div className="flex items-center gap-3">
+                <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-300 hover:text-white p-1 transition-colors">
+                    <Menu size={24} />
+                </button>
+                <span className="font-bold tracking-wide">KréTan Admin</span>
+            </div>
+            <button onClick={handleLogout} className="text-red-400 hover:text-red-300 p-1 transition-colors">
+                <X size={24}/>
+            </button>
         </div>
+
+        {/* --- MENU OVERLAY MOBILE --- */}
+        {isMobileMenuOpen && (
+            <div className="md:hidden fixed inset-0 z-50 flex">
+                {/* Fond sombre (cliquer à côté ferme le menu) */}
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
+                
+                {/* Panneau de navigation */}
+                <div className="relative w-64 bg-gray-900 h-full flex flex-col shadow-2xl animate-fade-in-left">
+                    <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                        <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Menu</span>
+                        <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-white">
+                            <X size={24} />
+                        </button>
+                    </div>
+                    
+                    <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                        <button onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-orange-500 text-white font-bold' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}>
+                            <Layout size={20}/> Tableau de bord
+                        </button>
+                        
+                        {currentUserRole && (currentUserRole.toLowerCase() === 'superadmin' || currentUserRole.toLowerCase() === 'admin' || currentUserRole.toLowerCase() === 'directeur') && (
+                            <>
+                                <button onClick={() => { setView('users'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'users' ? 'bg-blue-600 text-white font-bold' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}>
+                                    <Users size={20}/> Équipe Interne
+                                </button>
+                                <button onClick={() => { setView('ai'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'ai' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}>
+                                    <Brain size={20}/> Cerveau IA
+                                </button>
+                                <button onClick={() => { setView('website'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'website' ? 'bg-teal-600 text-white font-bold' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`}>
+                                    <Layout size={20}/> Gestion Site Web
+                                </button>
+                            </>
+                        )}
+                    </nav>
+                </div>
+            </div>
+        )}
 
         <div className="p-6 md:p-10 max-w-7xl mx-auto pb-24">
             
