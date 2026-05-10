@@ -24,7 +24,6 @@ import Features from './sections/Features';
 import Contact from './sections/Contact';
 import QuoteModal from './components/QuoteModal';
 import Promo from './sections/Promo';
-import OngoingProjects from './sections/OngoingProjects';
 const App = () => {
   const [isQuoteOpen, setIsQuoteOpen] = useState(false);
   const [teamList, setTeamList] = useState([]);
@@ -131,12 +130,6 @@ const App = () => {
         t={t} 
         setSelectedImage={setSelectedImage} 
       />
-{/* --- SECTION TEASING CONFIDENTIEL (PROJETS EN COURS) --- */}
-      <OngoingProjects 
-      openModal={openModal} 
-      setSelectedImage={setSelectedImage}
-      />
-
       {/* --- SECTION CONTACT (Siège Social) --- */}
       <Contact openModal={openModal} />
       {/* --- SECTION ÉQUIPE --- */}

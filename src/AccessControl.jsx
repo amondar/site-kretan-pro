@@ -15,6 +15,16 @@ import {
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, auth, secondaryAuth } from './firebase';
 
+import AdminProjects from "./admin/AdminProjects";
+import AdminTeam from './admin/AdminTeam';
+import AdminPromo from './admin/AdminPromo';
+import AdminLetters from './admin/AdminLetters';
+import AdminSocials from './admin/AdminSocials';
+import AdminUsers from './admin/AdminUsers';
+import AdminAi from './admin/AdminAi';
+import AdminOngoing from './admin/AdminOngoing';
+import AdminPartners from './admin/AdminPartners';
+
 
 const AccessControl = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -66,6 +76,17 @@ const AccessControl = () => {
   const [newLetter, setNewLetter] = useState({ title: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' });
   const [editingLetterId, setEditingLetterId] = useState(null);
   const [letterImageFile, setLetterImageFile] = useState(null);
+
+  const [ongoingProjects, setOngoingProjects] = useState([]);
+  const [newOngoing, setNewOngoing] = useState({ title: '', location: '', imageUrl: '', pdfUrl: '' });
+  const [ongoingImageFiles, setOngoingImageFiles] = useState([]);
+  const [ongoingPdfFile, setOngoingPdfFile] = useState(null);
+
+  const [editingOngoingId, setEditingOngoingId] = useState(null);
+
+  const [partnersList, setPartnersList] = useState([]);
+  const [newPartner, setNewPartner] = useState({ name: '', logoUrl: '' });
+  const [partnerLogoFile, setPartnerLogoFile] = useState(null);
   
   // ✅ CORRECTION : PROTECTION ANTI-CRASH (PAGE BLANCHE)
   useEffect(() => {
@@ -136,6 +157,17 @@ const AccessControl = () => {
     const qLetters = query(collection(db, "open_letters"), orderBy("createdAt", "desc"));
     const unsubLetters = onSnapshot(qLetters, (snap) => setOpenLetters(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
+
+    const qOngoing = query(collection(db, "ongoing_projects"), orderBy("createdAt", "desc"));
+    const unsubOngoing = onSnapshot(qOngoing, (snap) => setOngoingProjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+// Pensez à ajouter unsubOngoing() dans le return de nettoyage du useEffect !
+
+    const qPartners = query(collection(db, "partners"), orderBy("name", "asc"));
+    const unsubPartners = onSnapshot(qPartners, (snap) => {
+    setPartnersList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+// Ajoutez unsubPartners() dans la fonction de nettoyage (return) du useEffect !
+
     const loadSocials = async () => {
         try {
             const docRef = doc(db, "content", "social_links");
@@ -152,8 +184,9 @@ const AccessControl = () => {
         } catch (e) { console.error("Erreur social", e); }
     };
     loadSocials();
+    
 
-    return () => { unsubLogs(); unsubUsers(); unsubBrain(); unsubProjects(); unsubTeam(); };
+    return () => { unsubLogs(); unsubUsers(); unsubBrain(); unsubProjects(); unsubTeam(); unsubPartners(); };
   }, [isAuthenticated]); 
 
   const showFeedback = (type, msg) => {
@@ -192,6 +225,9 @@ const AccessControl = () => {
       alert("Erreur de connexion lors de l'envoi");
       return null;
     }
+
+    
+
   };
 
   const handleLogin = async (e) => {
@@ -451,6 +487,115 @@ const AccessControl = () => {
       showFeedback('success', "La lettre est maintenant en ligne sur le site !");
   };
 
+  const handleAddOngoing = async (e) => {
+      e.preventDefault();
+      setIsUploading(true);
+      let uploadedImages = []; 
+      let finalPdfUrl = newOngoing.pdfUrl;
+
+      // Upload des nouvelles images s'il y en a
+      if (ongoingImageFiles && ongoingImageFiles.length > 0) {
+          for (let i = 0; i < ongoingImageFiles.length; i++) {
+              const url = await uploadImage(ongoingImageFiles[i]);
+              if (url) uploadedImages.push(url);
+          }
+      }
+
+      if (ongoingPdfFile) {
+          const url = await uploadImage(ongoingPdfFile);
+          if (url) finalPdfUrl = url;
+      }
+
+      // Si on est en mode "Modification" (le crayon a été cliqué)
+      if (editingOngoingId) {
+          await updateDoc(doc(db, "ongoing_projects", editingOngoingId), {
+              title: newOngoing.title,
+              location: newOngoing.location,
+              // Si on a uploadé de nouvelles images, on remplace. Sinon on garde les anciennes.
+              imageUrls: uploadedImages.length > 0 ? uploadedImages : (newOngoing.imageUrls || []),
+              pdfUrl: finalPdfUrl,
+              updatedAt: serverTimestamp()
+          });
+          showFeedback('success', "Projet mis à jour avec succès !");
+      } else {
+          // Mode "Création" (comme avant)
+          await addDoc(collection(db, "ongoing_projects"), {
+              title: newOngoing.title,
+              location: newOngoing.location,
+              imageUrls: uploadedImages,
+              pdfUrl: finalPdfUrl,
+              createdAt: serverTimestamp()
+          });
+          showFeedback('success', "Projet en cours ajouté !");
+      }
+
+      // Nettoyage après sauvegarde
+      setNewOngoing({ title: '', location: '', imageUrl: '', imageUrls: [], pdfUrl: '' });
+      setOngoingImageFiles([]);
+      setOngoingPdfFile(null);
+      setEditingOngoingId(null); // On sort du mode édition
+      setIsUploading(false);
+  };
+
+  // NOUVELLE FONCTION : Quand on clique sur le crayon
+  const handleEditOngoing = (proj) => {
+      setNewOngoing({
+          title: proj.title,
+          location: proj.location,
+          imageUrls: proj.imageUrls || [],
+          pdfUrl: proj.pdfUrl || ''
+      });
+      setEditingOngoingId(proj.id); // Active le mode modification
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // Remonte la page vers le formulaire
+  };
+
+  const handleAddPartner = async (e) => {
+      // On s'assure que e existe avant d'appeler preventDefault (très utile si on utilise onClick)
+      if (e && e.preventDefault) e.preventDefault(); 
+      
+      // Sécurité : on empêche l'envoi si le nom est vide
+      if (!newPartner.name || newPartner.name.trim() === '') {
+          showFeedback('error', "Veuillez saisir un nom pour le partenaire.");
+          return;
+      }
+
+      setIsUploading(true);
+      
+      try {
+          console.log("1. Début de l'ajout du partenaire :", newPartner.name);
+          let finalLogoUrl = '';
+
+          // Si un logo est sélectionné, on l'envoie sur Cloudinary
+          if (partnerLogoFile) {
+              console.log("2. Envoi du logo en cours...");
+              const url = await uploadImage(partnerLogoFile);
+              if (url) {
+                  finalLogoUrl = url;
+                  console.log("3. Logo uploadé avec succès :", url);
+              }
+          }
+
+          console.log("4. Sauvegarde dans la base de données Firebase...");
+          await addDoc(collection(db, "partners"), { 
+              name: newPartner.name, 
+              logoUrl: finalLogoUrl 
+          });
+
+          console.log("5. Succès total !");
+          setNewPartner({ name: '', logoUrl: '' });
+          setPartnerLogoFile(null);
+          showFeedback('success', "Partenaire ajouté avec succès !");
+          
+      } catch (error) {
+          // S'il y a le moindre problème, ça s'affichera ici au lieu de bloquer !
+          console.error("ERREUR CRITIQUE lors de l'ajout du partenaire :", error);
+          showFeedback('error', "Une erreur est survenue lors de l'ajout.");
+      } finally {
+          // Quoi qu'il arrive (succès ou erreur), on arrête le chargement du bouton
+          setIsUploading(false);
+      }
+  };
+
   if (isLoadingAuth) {
      return <div className="min-h-[400px] bg-white flex items-center justify-center rounded-xl"><p className="text-xl font-bold animate-pulse text-gray-500">Vérification de la sécurité...</p></div>;
   }
@@ -488,300 +633,107 @@ const AccessControl = () => {
   }
 
   return (
-    <section className="py-10 bg-gray-50 min-h-screen">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="bg-white p-6 rounded-xl shadow mb-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">KréTan Admin</h1>
-          <button onClick={handleLogout} className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded font-bold transition-colors">Déconnexion</button>
+    // On met le CMS en plein écran, par-dessus tout le reste du site (z-50)
+    <div className="fixed inset-0 z-50 flex bg-gray-50 h-screen w-screen overflow-hidden font-sans">
+      
+      {/* --- BARRE LATÉRALE (SIDEBAR) NOIRE ÉLÉGANTE --- */}
+      <aside className="w-64 bg-gray-900 text-gray-300 flex flex-col shadow-2xl z-20 hidden md:flex">
+        <div className="p-6 border-b border-gray-800 bg-gray-950">
+          <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-orange-500">
+            KréTan Admin
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">Espace Staff</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-full font-bold ${view === 'dashboard' ? 'bg-orange-500 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>📊 Tableau de bord</button>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'dashboard' ? 'bg-orange-500 text-white font-bold shadow-lg' : 'hover:bg-gray-800 hover:text-white'}`}>
+            <Layout size={20}/> Tableau de bord
+          </button>
           
-          {/* RESTRICTION : Seuls les Admins voient ces boutons */}
-{currentUserRole && (currentUserRole.toLowerCase() === 'superadmin' || currentUserRole.toLowerCase() === 'admin' || currentUserRole.toLowerCase() === 'directeur') && (
-      <>
-          <button onClick={() => setView('users')} className={`px-4 py-2 rounded-full font-bold ${view === 'users' ? 'bg-blue-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>👥 Équipe</button>
-                  <button onClick={() => setView('ai')} className={`px-4 py-2 rounded-full font-bold ${view === 'ai' ? 'bg-purple-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>🧠 IA</button>
-                  <button onClick={() => setView('website')} className={`px-4 py-2 rounded-full font-bold ${view === 'website' ? 'bg-teal-600 text-white' : 'bg-white shadow-sm hover:bg-gray-50'}`}>🖥️ Site Web</button>
-              </>
+          {currentUserRole && (currentUserRole.toLowerCase() === 'superadmin' || currentUserRole.toLowerCase() === 'admin' || currentUserRole.toLowerCase() === 'directeur') && (
+            <>
+              <button onClick={() => setView('users')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'users' ? 'bg-blue-600 text-white font-bold shadow-lg' : 'hover:bg-gray-800 hover:text-white'}`}>
+                <Users size={20}/> Équipe Interne
+              </button>
+              <button onClick={() => setView('ai')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'ai' ? 'bg-indigo-600 text-white font-bold shadow-lg' : 'hover:bg-gray-800 hover:text-white'}`}>
+                <Brain size={20}/> Cerveau IA
+              </button>
+              <button onClick={() => setView('website')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === 'website' ? 'bg-teal-600 text-white font-bold shadow-lg' : 'hover:bg-gray-800 hover:text-white'}`}>
+                <Layout size={20}/> Gestion Site Web
+              </button>
+            </>
           )}
+        </nav>
+
+        <div className="p-4 border-t border-gray-800 bg-gray-950">
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-4 py-3 rounded-lg font-bold transition-colors">
+            <X size={18} /> Déconnexion
+          </button>
+        </div>
+      </aside>
+
+      {/* --- ZONE CENTRALE (AÉRÉE ET SPACIEUSE) --- */}
+      <main className="flex-1 h-full overflow-y-auto bg-gray-50 relative">
+        {/* En-tête mobile (si besoin) */}
+        <div className="md:hidden bg-gray-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-10">
+            <span className="font-bold">KréTan Admin</span>
+            <button onClick={handleLogout} className="text-red-400"><X size={24}/></button>
         </div>
 
-        {view === 'dashboard' && <div className="bg-white p-6 rounded shadow"><h3 className="font-bold mb-4">Journal des accès</h3><div className="max-h-96 overflow-auto">{accessLogs.map(l=><div key={l.id} className="border-b p-2 flex justify-between"><span>{l.displayDate} - {l.name}</span><span className={l.status==='Succès'?'text-green-600':'text-red-600'}>{l.status}</span></div>)}</div></div>}
-        
-        {view === 'users' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow h-fit border-t-4 border-blue-500">
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-800"><PlusCircle size={20}/> Nouvel Employé</h3>
-              <form onSubmit={handleAddEmployee} className="space-y-4">
-                <div><label className="text-xs font-bold text-gray-500">Nom Complet</label><input required className="w-full border p-2 rounded" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} placeholder="Ex: Kouassi Jean" /></div>
-                
-                {/* NOUVEAU CHAMP EMAIL */}
-                <div><label className="text-xs font-bold text-gray-500">Email de connexion</label><input type="email" required className="w-full border p-2 rounded" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} placeholder="Ex: jean@kretanpro.ci" /></div>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-500">Rôle / Poste</label>
-                  <select className="w-full border p-2 rounded bg-white" value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value})}>
-                    <option value="Ouvrier">Ouvrier</option>
-                    <option value="Chef de Chantier">Chef de Chantier</option>
-                    <option value="Admin">Admin (Accès CMS Complet)</option>
-                    <option value="Directeur">Directeur</option>
-                  </select>
+        <div className="p-6 md:p-10 max-w-7xl mx-auto pb-24">
+            
+            {/* Les messages de succès/erreur */}
+            {feedback.msg && (
+                <div className={`mb-6 p-4 rounded-lg font-bold shadow-sm ${feedback.type === 'success' ? 'bg-green-100 text-green-800 border-l-4 border-green-500' : 'bg-red-100 text-red-800 border-l-4 border-red-500'}`}>
+                    {feedback.msg}
                 </div>
-                <div><label className="text-xs font-bold text-gray-500">Code (Mot de passe) - Min 6 caractères</label><input required className="w-full border p-2 rounded uppercase font-mono text-center tracking-widest" value={newEmp.code} onChange={e => setNewEmp({...newEmp, code: e.target.value})} placeholder="Ex: A12345" minLength={6} maxLength={10}/></div>
-                <button type="submit" disabled={isUploading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition shadow-md">{isUploading ? 'Création...' : 'Enregistrer'}</button>
-              </form>
-            </div>
-            <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow border-t-4 border-gray-200">
-               <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-gray-700">Liste du personnel ({employees.length})</h3></div>
-               <div className="overflow-auto max-h-[500px]">
-                 <table className="w-full text-sm">
-                   <thead className="bg-gray-100 text-gray-600 font-bold text-left sticky top-0">
-                     <tr><th className="p-3 rounded-tl-lg">Nom</th><th className="p-3">Rôle</th><th className="p-3">Code interne</th><th className="p-3 rounded-tr-lg text-center">Action</th></tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-100">
-                     {employees.map(emp => (
-                       <tr key={emp.id} className="hover:bg-blue-50 transition">
-                         <td className="p-3 font-bold text-gray-800">{emp.name}</td>
-                         <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${emp.role === 'Admin' ? 'bg-purple-100 text-purple-700' : emp.role === 'Chef de Chantier' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{emp.role}</span></td>
-                         <td className="p-3 font-mono text-gray-500">{emp.code}</td>
-                         <td className="p-3 text-center"><button onClick={() => handleDelete('users', emp.id)} className="text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-full hover:bg-red-100 transition"><Trash2 size={16}/></button></td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-                 {employees.length === 0 && <p className="text-center text-gray-400 py-8 italic">Aucun employé enregistré.</p>}
-               </div>
-            </div>
-          </div>
-        )}        
-        {view === 'ai' && <div className="bg-white p-6 rounded shadow"><h3 className="font-bold mb-4">Cerveau IA</h3><form onSubmit={handleAddRule} className="flex gap-2 mb-4"><input className="border p-2 rounded" placeholder="Mots clés..." value={newRule.keywords} onChange={e=>setNewRule({...newRule, keywords:e.target.value})}/><input className="border p-2 rounded flex-1" placeholder="Réponse..." value={newRule.response} onChange={e=>setNewRule({...newRule, response:e.target.value})}/><button className="bg-purple-500 text-white px-4 rounded">Apprendre</button></form><div>{knowledge.map(k=><div key={k.id} className="flex justify-between border-b p-2"><span><b>Si:</b> {k.keywords} {'->'} <b>Dire:</b> {k.response}</span><button onClick={()=>handleDelete('chatbot_knowledge', k.id)}><Trash2 size={16} className="text-red-500"/></button></div>)}</div></div>}
+            )}
 
-        {view === 'website' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-orange-500 lg:col-span-2">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-100">
-                        <h3 className="font-bold text-lg flex items-center gap-2 text-orange-800">📢 Gestion de la Promotion</h3>
-                        <div className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-lg border">
-                             <span className="text-sm font-bold text-gray-700">Activer la Promo :</span>
-                             <button type="button" onClick={() => setPromo({...promo, active: !promo.active})} className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${promo?.active ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${promo?.active ? 'translate-x-6' : ''}`} />
-                             </button>
-                        </div>
-                    </div>
-                    <form onSubmit={handleUpdatePromo} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-2 bg-green-50 p-3 rounded border border-green-200">
-                            <label className="block text-xs font-bold text-green-800 mb-1">🟢 Texte du Bandeau (Tout en haut du site) :</label>
-                            <input className="border p-2 rounded w-full text-sm" placeholder="Ex: Livraison gratuite jusqu'à ce soir..." value={promo?.text || ''} onChange={e => setPromo({...promo, text: e.target.value})} />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Titre Principal :</label>
-                            <input className="border p-2 rounded w-full" placeholder="Ex: Grande Promo Tabaski" value={promo?.title || ''} onChange={e => setPromo({...promo, title: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Réduction (-XX%) :</label>
-                            <input className="border p-2 rounded w-full" placeholder="-20%" value={promo?.discount || ''} onChange={e => setPromo({...promo, discount: e.target.value})} />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Description détaillée :</label>
-                            <textarea className="border p-2 rounded w-full h-20" placeholder="Ex: Valable sur tous les travaux..." value={promo?.description || ''} onChange={e => setPromo({...promo, description: e.target.value})} />
-                        </div>
-                        <div className="md:col-span-2 flex flex-col md:flex-row gap-4 items-center mt-2 pt-4 border-t border-dashed border-gray-300">
-                            <div className="flex-1 w-full">
-                                <label className="block text-xs font-bold text-orange-600 mb-1">📸 Photo depuis l'ordi :</label>
-                                <input type="file" accept="image/*" onChange={(e) => setPromoImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200 cursor-pointer" />
-                            </div>
-                            <span className="text-gray-400 font-bold">OU</span>
-                            <div className="flex-1 w-full">
-                                <label className="block text-xs font-bold text-gray-600 mb-1">🌐 Lien URL (Internet) :</label>
-                                <input className="border p-2 rounded w-full text-sm bg-gray-50" placeholder="https://..." value={promo?.bgImage || ''} onChange={e => setPromo({...promo, bgImage: e.target.value})} />
-                            </div>
-                        </div>
-                        <button disabled={isUploading} className="md:col-span-2 bg-gradient-to-r from-orange-600 to-orange-500 text-white font-bold py-3 rounded-lg hover:from-orange-700 hover:to-orange-600 flex justify-center items-center gap-2 mt-4 shadow-md">
-                             {isUploading ? "Envoi en cours..." : "Sauvegarder la Promotion"}
-                             {!isUploading && <Upload size={18}/>}
-                        </button>
-                    </form>
-                </div>
+            {view === 'dashboard' && <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100"><h3 className="font-bold text-xl mb-6 text-gray-800">Journal des accès</h3><div className="max-h-[600px] overflow-auto divide-y">{accessLogs.map(l=><div key={l.id} className="py-3 flex justify-between items-center"><span className="text-gray-600"><span className="font-bold text-gray-900">{l.name}</span> <span className="text-sm ml-2">({l.displayDate})</span></span><span className={`px-3 py-1 rounded-full text-xs font-bold ${l.status==='Succès'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{l.status}</span></div>)}</div></div>}
+            
+            {view === 'users' && <AdminUsers newEmp={newEmp} setNewEmp={setNewEmp} handleAddEmployee={handleAddEmployee} isUploading={isUploading} employees={employees} handleDelete={handleDelete} />}
+            
+            {view === 'ai' && <AdminAi newRule={newRule} setNewRule={setNewRule} handleAddRule={handleAddRule} knowledge={knowledge} handleDelete={handleDelete} />}
 
-                {/* --- LETTRE OUVERTE / ÉDITO MULTIMÉDIA --- */}
-                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-gray-800 lg:col-span-2">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-800">📜 Lettres Ouvertes (Historique & Multimédia)</h3>
-                    
-                    <form onSubmit={handleSaveOpenLetter} className="space-y-4 mb-8 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">Titre / Objet :</label><input required className="w-full border p-2 rounded" value={newLetter.title} onChange={e => setNewLetter({...newLetter, title: e.target.value})} placeholder="Ex: Message à nos partenaires" /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">Date d'affichage :</label><input required className="w-full border p-2 rounded" value={newLetter.date} onChange={e => setNewLetter({...newLetter, date: e.target.value})} /></div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Image d'illustration (Fichier) :</label>
-                                <input type="file" accept="image/*" onChange={(e) => setLetterImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">OU Lien de l'image (URL) :</label>
-                                <input className="w-full border p-2 rounded" value={newLetter.imageUrl} onChange={e => setNewLetter({...newLetter, imageUrl: e.target.value})} placeholder="https://..." />
-                            </div>
-                        </div>
+            {view === 'website' && (
+              // Ici, on utilise space-y-12 pour bien espacer les blocs au lieu de les tasser
+              <div className="space-y-12">
+                  <AdminPromo promo={promo} setPromo={setPromo} handleUpdatePromo={handleUpdatePromo} setPromoImageFile={setPromoImageFile} isUploading={isUploading} />
+                  
+                  {/* C'est ici que viendra le composant AdminPartners ! */}
+                  
+                  <AdminLetters newLetter={newLetter} setNewLetter={setNewLetter} handleSaveOpenLetter={handleSaveOpenLetter} isUploading={isUploading} setLetterImageFile={setLetterImageFile} editingLetterId={editingLetterId} setEditingLetterId={setEditingLetterId} openLetters={openLetters} handleActivateLetter={handleActivateLetter} handleEditLetter={handleEditLetter} handleDelete={handleDelete} />
+                  <AdminPartners 
+                    newPartner={newPartner} 
+                    setNewPartner={setNewPartner} 
+                    setPartnerLogoFile={setPartnerLogoFile} 
+                    handleAddPartner={handleAddPartner} 
+                    isUploading={isUploading} 
+                    partnersList={partnersList} 
+                    handleDelete={handleDelete} 
+                  />
 
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Corps de la lettre :</label><textarea required className="w-full border p-4 rounded h-40 font-serif text-gray-700 leading-relaxed bg-white" placeholder="Chers partenaires..." value={newLetter.content} onChange={e => setNewLetter({...newLetter, content: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">Signature :</label><input required className="w-full border p-2 rounded font-bold text-gray-700" value={newLetter.signature} onChange={e => setNewLetter({...newLetter, signature: e.target.value})} placeholder="La Direction KréTan" /></div>
-                        
-                        <div className="flex gap-2">
-                            <button type="submit" disabled={isUploading} className="flex-1 bg-gray-800 text-white font-bold py-2 rounded hover:bg-black transition flex justify-center gap-2">
-                                {isUploading ? "Sauvegarde..." : (editingLetterId ? "Mettre à jour la lettre" : "Sauvegarder la lettre")} 
-                                {!isUploading && (editingLetterId ? <Edit size={18}/> : <Save size={18}/>)}
-                            </button>
-                            {editingLetterId && (
-                                <button type="button" onClick={() => {setEditingLetterId(null); setNewLetter({ title: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' })}} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 transition">Annuler</button>
-                            )}
-                        </div>
-                    </form>
-
-                    {/* Historique des lettres */}
-                    <h4 className="font-bold text-sm text-gray-500 mb-3 uppercase tracking-wider">Historique & Publication</h4>
-                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                        {openLetters.map(lettre => (
-                            <div key={lettre.id} className={`flex items-center gap-4 border p-3 rounded-lg shadow-sm transition ${lettre.active ? 'border-green-500 bg-green-50' : 'bg-white'}`}>
-                                {lettre.imageUrl ? (
-                                    <img src={lettre.imageUrl} className="w-16 h-16 rounded object-cover" alt="mini" />
-                                ) : (
-                                    <div className="w-16 h-16 rounded bg-gray-100 flex items-center justify-center text-gray-400"><Layout size={20}/></div>
-                                )}
-                                
-                                <div className="flex-1">
-                                    <p className="font-bold text-gray-800 text-sm">{lettre.title}</p>
-                                    <p className="text-xs text-gray-500">{lettre.date} • {lettre.signature}</p>
-                                    {lettre.active && <span className="inline-block mt-1 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">En ligne</span>}
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => handleActivateLetter(lettre.id, lettre.active)} className={`text-xs font-bold px-3 py-1.5 rounded transition ${lettre.active ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
-                                        {lettre.active ? 'Retirer' : 'Publier'}
-                                    </button>
-                                    <button onClick={() => handleEditLetter(lettre)} className="text-blue-500 hover:bg-blue-100 p-2 rounded transition" title="Modifier"><Edit size={16}/></button>
-                                    <button onClick={() => handleDelete('open_letters', lettre.id)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Supprimer"><Trash2 size={16}/></button>
-                                </div>
-                            </div>
-                        ))}
-                        {openLetters.length === 0 && <p className="text-gray-400 italic text-sm text-center py-4">Aucune lettre sauvegardée.</p>}
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-teal-500">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Layout className="text-teal-500"/> Portfolio</h3>
-                    <form onSubmit={handleAddProject} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-teal-50 p-4 rounded-lg">
-                        <input className="border p-2 rounded" placeholder="Titre du projet (ex: Villa Assinie)" value={newProject.title} onChange={e => setNewProject({...newProject, title: e.target.value})} />
-                        <select className="border p-2 rounded" value={newProject.type} onChange={e => setNewProject({...newProject, type: e.target.value})}>
-                            <option>Gros Œuvre</option><option>Finition</option><option>Rénovation</option><option>Route / VRD</option>
-                        </select>
-                        <div className="md:col-span-2">
-                             <label className="block text-xs font-bold text-red-600 mb-1 flex items-center gap-1"><Youtube size={14}/> Option Vidéo (Youtube) :</label>
-                             <input className="border p-2 rounded w-full border-red-200 bg-red-50 text-sm" placeholder="Collez le lien YouTube ici (ex: https://youtu.be/...)" value={newProject.videoUrl || ''} onChange={e => setNewProject({...newProject, videoUrl: e.target.value})} />
-                             <p className="text-[10px] text-gray-500 mt-1 italic">Si vous mettez une vidéo, elle remplacera la photo sur le site.</p>
-                        </div>
-                        <div className="md:col-span-2 flex gap-2 items-center border-t border-gray-200 pt-2">
-                            <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Ou Photo depuis l'ordi :</label>
-                                <input type="file" accept="image/*" onChange={(e) => setProjectImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200"/>
-                            </div>
-                        </div>
-                        <button disabled={isUploading} className="md:col-span-2 bg-teal-600 text-white font-bold py-2 rounded hover:bg-teal-700 flex justify-center items-center gap-2">
-                            {isUploading ? "Envoi..." : "Ajouter ce projet"}
-                            {!isUploading && <Upload size={18}/>}
-                        </button>
-                    </form>
-                    <div className="max-h-40 overflow-y-auto">{projects.map(p=><div key={p.id} className="flex justify-between border-b p-1"><span className="text-sm">{p.title}</span><button onClick={()=>handleDelete('projects', p.id)}><Trash2 size={14} className="text-red-500"/></button></div>)}</div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-blue-600 lg:col-span-2">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-800">🌐 Réseaux Sociaux</h3>
-                    <form onSubmit={handleUpdateSocials} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-gray-500">Facebook</label><input className="w-full border p-2 rounded" placeholder="https://facebook.com/..." value={socialLinks.facebook || ''} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-gray-500">YouTube</label><input className="w-full border p-2 rounded" placeholder="https://youtube.com/..." value={socialLinks.youtube || ''} onChange={e => setSocialLinks({...socialLinks, youtube: e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-gray-500">LinkedIn</label><input className="w-full border p-2 rounded" placeholder="https://linkedin.com/..." value={socialLinks.linkedin || ''} onChange={e => setSocialLinks({...socialLinks, linkedin: e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-gray-500">Instagram</label><input className="w-full border p-2 rounded" placeholder="https://instagram.com/..." value={socialLinks.instagram || ''} onChange={e => setSocialLinks({...socialLinks, instagram: e.target.value})} /></div>
-                        <div className="md:col-span-2"><button className="w-full bg-blue-600 text-white font-bold py-2 rounded">Enregistrer les liens</button></div>
-                    </form>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow border-t-4 border-purple-600 lg:col-span-2">
-                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-purple-800">👔 L'Équipe (Visible sur le site)</h3>
-                    <form onSubmit={handleAddPublicTeam} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-purple-50 p-4 rounded-lg">
-                        <input required className="border p-2 rounded" placeholder="Nom Complet" value={newTeamMember.name} onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})} />
-                        <input required className="border p-2 rounded" placeholder="Poste (ex: Directeur Technique)" value={newTeamMember.role} onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})} />
-                        
-                        {/* SECTION IMAGE */}
-                        <div className="md:col-span-2 flex gap-2 items-center bg-white p-3 rounded shadow-sm border border-gray-100">
-                            <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">📸 Photo du membre :</label>
-                                <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" />
-                            </div>
-                            <span className="text-gray-300 font-bold text-xs">OU URL:</span>
-                            <div className="flex-1">
-                                <input className="border p-1.5 text-sm rounded w-full" placeholder="https://..." value={newTeamMember.imageUrl} onChange={e => setNewTeamMember({...newTeamMember, imageUrl: e.target.value})} />
-                            </div>
-                        </div>
-
-                        {/* SECTION CV PDF */}
-                        <div className="md:col-span-2 flex gap-2 items-center bg-white p-3 rounded shadow-sm border border-gray-100">
-                            <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">📄 Fichier CV (PDF) :</label>
-                                <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setCvFile(e.target.files[0])} className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-teal-100 file:text-teal-700 hover:file:bg-teal-200" />
-                            </div>
-                            <span className="text-gray-300 font-bold text-xs">OU URL:</span>
-                            <div className="flex-1">
-                                <input className="border p-1.5 text-sm rounded w-full" placeholder="Lien vers le CV..." value={newTeamMember.cvUrl} onChange={e => setNewTeamMember({...newTeamMember, cvUrl: e.target.value})} />
-                            </div>
-                        </div>
-
-                        {/* TEXTES (Citation & Bio) */}
-                        <input className="border p-2 rounded md:col-span-2" placeholder="Petite citation / Slogan (Visible sur l'accueil)..." value={newTeamMember.quote} onChange={e => setNewTeamMember({...newTeamMember, quote: e.target.value})} />
-                        
-                        <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1">Biographie Complète & Parcours :</label>
-                            <textarea className="border p-2 rounded w-full h-32 text-sm text-gray-700" placeholder="Décrivez le parcours, les diplômes, l'expérience..." value={newTeamMember.bio} onChange={e => setNewTeamMember({...newTeamMember, bio: e.target.value})} />
-                        </div>
-
-                        <div className="md:col-span-2 flex gap-2 mt-2">
-                            <button disabled={isUploading} type="submit" className="flex-1 bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700 flex justify-center items-center gap-2 transition shadow-md">
-                                {isUploading ? "Envoi en cours..." : (editingTeamMemberId ? "Mettre à jour ce membre" : "Ajouter ce membre")}
-                                {!isUploading && (editingTeamMemberId ? <Save size={18}/> : <Upload size={18}/>)}
-                            </button>
-                            {editingTeamMemberId && (
-                                <button type="button" onClick={cancelEditTeamMember} className="bg-gray-400 text-white font-bold py-2 px-4 rounded hover:bg-gray-500 transition">Annuler</button>
-                            )}
-                        </div>
-                    </form>
-
-                    {/* --- LA LISTE DES MEMBRES --- */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {publicTeam.map(member => (
-                            <div key={member.id} className={`flex items-center gap-3 border p-2 rounded shadow-sm transition ${editingTeamMemberId === member.id ? 'bg-purple-100 border-purple-400' : 'bg-white'}`}>
-                                <img src={member.imageUrl || 'https://via.placeholder.com/50'} className="w-10 h-10 rounded-full object-cover" alt="avatar" />
-                                <div className="flex-1">
-                                    <p className="font-bold text-sm">{member.name}</p>
-                                    <p className="text-xs text-gray-500">{member.role}</p>
-                                </div>
-                                {/* NOUVEAU : Bouton Éditer (Crayon) */}
-                                <button onClick={() => handleEditTeamMember(member)} className="text-blue-500 hover:bg-blue-100 p-2 rounded transition" title="Modifier">
-                                    <Edit size={16}/>
-                                </button>
-                                {/* Ancien Bouton Supprimer */}
-                                <button onClick={() => handleDelete('public_team', member.id)} className="text-red-500 hover:bg-red-50 p-2 rounded transition" title="Supprimer">
-                                    <Trash2 size={16}/>
-                                </button>
-                            </div>
-                        ))}
-                        {publicTeam.length === 0 && <p className="text-gray-400 italic text-sm">Aucun membre affiché sur le site.</p>}
-                    </div>
-                </div>
-            </div>
-        )}
-      </div>
-    </section>
+                  <AdminProjects newProject={newProject} setNewProject={setNewProject} setProjectImageFile={setProjectImageFile} handleAddProject={handleAddProject} isUploading={isUploading} projects={projects} handleDelete={handleDelete} />
+                  <AdminOngoing 
+                  newOngoing={newOngoing} 
+                  setNewOngoing={setNewOngoing} // <-- Indispensable
+                  handleEditOngoing={handleEditOngoing} // <-- Indispensable
+                  setNewOngoing={setNewOngoing} 
+                  setOngoingImageFile={setOngoingImageFiles} 
+                  setOngoingPdfFile={setOngoingPdfFile} 
+                  handleAddOngoing={handleAddOngoing} 
+                  isUploading={isUploading} 
+                  ongoingProjects={ongoingProjects} 
+                  handleDelete={handleDelete} />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <AdminSocials socialLinks={socialLinks} setSocialLinks={setSocialLinks} handleUpdateSocials={handleUpdateSocials} />
+                  </div>
+                  <AdminTeam newTeamMember={newTeamMember} setNewTeamMember={setNewTeamMember} setImageFile={setImageFile} setCvFile={setCvFile} handleAddPublicTeam={handleAddPublicTeam} isUploading={isUploading} editingTeamMemberId={editingTeamMemberId} cancelEditTeamMember={cancelEditTeamMember} publicTeam={publicTeam} handleEditTeamMember={handleEditTeamMember} handleDelete={handleDelete} />
+              </div>
+            )}
+        </div>
+      </main>
+    </div>
   );
 };
 
