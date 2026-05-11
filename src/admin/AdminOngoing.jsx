@@ -29,7 +29,18 @@ const AdminOngoing = ({
                 <label className="block text-xs font-bold text-gray-500 mb-1">Localisation / Statut :</label>
                 <input required className="border p-2 rounded w-full" placeholder="Ex: Abidjan - Phase d'étude" value={newOngoing.location} onChange={e => setNewOngoing({...newOngoing, location: e.target.value})} />
             </div>
-            
+
+            {/* À placer sous le input de la Localisation */}
+            <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2">Description / Détails du projet :</label>
+                <textarea 
+                    className="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-teal-500 outline-none bg-white min-h-[100px]" 
+                    placeholder="Ex: Villa moderne de 4 pièces avec plafonnage spécial... (Sauts de ligne autorisés)" 
+                    value={newOngoing.description || ''} 
+                    onChange={e => setNewOngoing({...newOngoing, description: e.target.value})} 
+                />
+            </div>
+                        
             {/* IMAGE FLOUTÉE */}
             {/* GALERIE D'IMAGES (Vues 3D) */}
             <div className="md:col-span-2 bg-white p-3 rounded shadow-sm border border-gray-100">

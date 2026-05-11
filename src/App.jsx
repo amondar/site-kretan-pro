@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, X, ArrowRight, CheckCircle, HardHat, Home, PenTool, Truck, Users, 
   MessageCircle, Send, Facebook, Youtube, Linkedin, Instagram, Lock, 
-  MapPin, Phone, Mail, Star, Award, Clock, Shield, Briefcase, User , Download
+  MapPin, Phone, Mail, Star, Award, Clock, Shield, Briefcase, User , Download, Images, ZoomIn, ChevronUp,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import AccessControl from './AccessControl';
 import ReactGA from "react-ga4";
@@ -175,18 +176,67 @@ const App = () => {
           </span>
       </a>
       <CookieConsent />
+      {/* ================= MODALE IMAGE (LIGHTBOX AVEC SLIDER) ================= */}
       {selectedImage && (
-        <div 
-            className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
-            onClick={() => setSelectedImage(null)}
-        >
-            <button className="absolute top-6 right-6 text-white hover:text-orange-500 transition"><X size={40} /></button>
-            <img 
-                src={selectedImage} 
-                alt="Zoom Projet" 
-                className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain animate-in fade-in zoom-in duration-300"
-                onClick={(e) => e.stopPropagation()} 
-            />
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center">
+            {/* Bouton Fermer (La croix en haut à droite) */}
+            <button onClick={() => setSelectedImage(null)} className="absolute top-4 right-4 md:top-6 md:right-8 text-gray-400 hover:text-white p-2 transition-colors z-50">
+                <X size={36} />
+            </button>
+
+            {/* Logique intelligente pour le Slider */}
+            {(() => {
+                // On vérifie si selectedImage est le nouveau paquet (Galerie) ou l'ancienne méthode (Simple URL)
+                const isGallery = typeof selectedImage === 'object' && selectedImage.images;
+                const images = isGallery ? selectedImage.images : [selectedImage];
+                const currentIndex = isGallery ? selectedImage.index : 0;
+
+                const handlePrev = (e) => {
+                    e.stopPropagation();
+                    const newIdx = currentIndex === 0 ? images.length - 1 : currentIndex - 1;
+                    setSelectedImage({ images, index: newIdx });
+                };
+
+                const handleNext = (e) => {
+                    e.stopPropagation();
+                    const newIdx = currentIndex === images.length - 1 ? 0 : currentIndex + 1;
+                    setSelectedImage({ images, index: newIdx });
+                };
+
+                return (
+                    <div className="relative w-full h-full flex items-center justify-center p-4" onClick={() => setSelectedImage(null)}>
+                        
+                        {/* Flèche Gauche (Visible uniquement s'il y a plusieurs images) */}
+                        {images.length > 1 && (
+                            <button onClick={handlePrev} className="absolute left-2 md:left-8 text-white hover:text-orange-500 p-3 bg-black/50 hover:bg-black/80 rounded-full transition-all z-50">
+                                <ChevronLeft size={40} />
+                            </button>
+                        )}
+
+                        {/* L'image centrale */}
+                        <img 
+                            src={images[currentIndex]} 
+                            alt="Aperçu HD" 
+                            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]" 
+                            onClick={(e) => e.stopPropagation()} // Clic sur l'image = Ne ferme pas la modale
+                        />
+
+                        {/* Compteur d'images en bas */}
+                        {images.length > 1 && (
+                            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-white bg-black/70 px-4 py-1.5 rounded-full text-sm font-bold tracking-widest z-50">
+                                {currentIndex + 1} / {images.length}
+                            </div>
+                        )}
+
+                        {/* Flèche Droite (Visible uniquement s'il y a plusieurs images) */}
+                        {images.length > 1 && (
+                            <button onClick={handleNext} className="absolute right-2 md:right-8 text-white hover:text-orange-500 p-3 bg-black/50 hover:bg-black/80 rounded-full transition-all z-50">
+                                <ChevronRight size={40} />
+                            </button>
+                        )}
+                    </div>
+                );
+            })()}
         </div>
       )}
 

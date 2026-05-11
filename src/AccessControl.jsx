@@ -86,7 +86,7 @@ const AccessControl = () => {
 
 // --- NOUVEAUX ÉTATS POUR LA LETTRE OUVERTE MULTIMÉDIA ---
   const [openLetters, setOpenLetters] = useState([]);
-  const [newLetter, setNewLetter] = useState({ title: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' });
+  const [newLetter, setNewLetter] = useState({ title: '', description: '', content: '', signature: 'La Direction', date: new Date().toLocaleDateString(), imageUrl: '' });
   const [editingLetterId, setEditingLetterId] = useState(null);
   const [letterImageFile, setLetterImageFile] = useState(null);
 
@@ -638,7 +638,6 @@ const AccessControl = () => {
       let uploadedImages = []; 
       let finalPdfUrl = newOngoing.pdfUrl;
 
-      // Upload des nouvelles images s'il y en a
       if (ongoingImageFiles && ongoingImageFiles.length > 0) {
           for (let i = 0; i < ongoingImageFiles.length; i++) {
               const url = await uploadImage(ongoingImageFiles[i]);
@@ -651,35 +650,39 @@ const AccessControl = () => {
           if (url) finalPdfUrl = url;
       }
 
-      // Si on est en mode "Modification" (le crayon a été cliqué)
-      if (editingOngoingId) {
-          await updateDoc(doc(db, "ongoing_projects", editingOngoingId), {
-              title: newOngoing.title,
-              location: newOngoing.location,
-              // Si on a uploadé de nouvelles images, on remplace. Sinon on garde les anciennes.
-              imageUrls: uploadedImages.length > 0 ? uploadedImages : (newOngoing.imageUrls || []),
-              pdfUrl: finalPdfUrl,
-              updatedAt: serverTimestamp()
-          });
-          showFeedback('success', "Projet mis à jour avec succès !");
-      } else {
-          // Mode "Création" (comme avant)
-          await addDoc(collection(db, "ongoing_projects"), {
-              title: newOngoing.title,
-              location: newOngoing.location,
-              imageUrls: uploadedImages,
-              pdfUrl: finalPdfUrl,
-              createdAt: serverTimestamp()
-          });
-          showFeedback('success', "Projet en cours ajouté !");
-      }
+      try {
+          if (editingOngoingId) {
+              await updateDoc(doc(db, "ongoing_projects", editingOngoingId), {
+                  title: newOngoing.title,
+                  location: newOngoing.location,
+                  description: newOngoing.description || '', // <-- IL MANQUAIT CETTE LIGNE
+                  imageUrls: uploadedImages.length > 0 ? uploadedImages : (newOngoing.imageUrls || []),
+                  pdfUrl: finalPdfUrl,
+                  updatedAt: serverTimestamp()
+              });
+              showFeedback('success', "Projet mis à jour avec succès !");
+          } else {
+              await addDoc(collection(db, "ongoing_projects"), {
+                  title: newOngoing.title,
+                  location: newOngoing.location,
+                  description: newOngoing.description || '', // <-- ET CELLE-CI AUSSI
+                  imageUrls: uploadedImages,
+                  pdfUrl: finalPdfUrl,
+                  createdAt: serverTimestamp()
+              });
+              showFeedback('success', "Projet en cours ajouté !");
+          }
 
-      // Nettoyage après sauvegarde
-      setNewOngoing({ title: '', location: '', imageUrl: '', imageUrls: [], pdfUrl: '' });
-      setOngoingImageFiles([]);
-      setOngoingPdfFile(null);
-      setEditingOngoingId(null); // On sort du mode édition
-      setIsUploading(false);
+          setNewOngoing({ title: '', location: '', description: '', imageUrl: '', imageUrls: [], pdfUrl: '' });
+          setOngoingImageFiles([]);
+          setOngoingPdfFile(null);
+          setEditingOngoingId(null);
+      } catch (error) {
+          console.error("Erreur sauvegarde:", error);
+          showFeedback('error', "Erreur lors de l'enregistrement.");
+      } finally {
+          setIsUploading(false);
+      }
   };
 
   // NOUVELLE FONCTION : Quand on clique sur le crayon
@@ -687,6 +690,7 @@ const AccessControl = () => {
       setNewOngoing({
           title: proj.title,
           location: proj.location,
+          description: proj.description || '', // <-- NOUVEAU
           imageUrls: proj.imageUrls || [],
           pdfUrl: proj.pdfUrl || ''
       });
