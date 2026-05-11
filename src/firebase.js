@@ -1,12 +1,7 @@
-// src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth"; // 👈 AJOUTER CECI
-
-// Your web app's Firebase configuration
-
-// Your web app's Firebase configuration
+// On importe les outils de persistance ici
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"; 
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,16 +12,16 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-const storage = getStorage(app);
+// On crée une deuxième instance auth pour créer des comptes employés sans déconnecter l'admin
+const secondaryAuth = getAuth(app); 
 
+// LE CORRECTIF EST ICI : On force la mémoire du navigateur de manière asynchrone
+setPersistence(auth, browserLocalPersistence)
+  .then(() => console.log("Mémoire Firebase activée !"))
+  .catch((error) => console.error("Erreur de mémoire Firebase:", error));
 
-export { db, storage };
-export const auth = getAuth(app); //
-
-// 🟢 NOUVEAU : Application Secondaire (Celle qui crée les employés en silence)
-const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
-export const secondaryAuth = getAuth(secondaryApp);
+export { db, auth, secondaryAuth };
