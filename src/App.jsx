@@ -40,6 +40,15 @@ const App = () => {
  const [selectedImage, setSelectedImage] = useState(null);
  const [partnersList, setPartnersList] = useState([]);
  
+// --- DÉTECTEUR DE LIEN STAFF (QR CODE) ---
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    // Si l'URL contient "?admin=true", on ouvre directement le CMS
+    if (urlParams.get('admin') === 'true') {
+      setShowAdmin(true);
+    }
+  }, []);
+
   const handleSecretClick = () => {
     setSecretClicks(prev => prev + 1);
     if (secretClicks + 1 === 3) {
